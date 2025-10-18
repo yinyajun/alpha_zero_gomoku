@@ -125,13 +125,16 @@ def train():
 
     total_num = 100000
     train_interval = 10
+    start = time.time()
+
     for i in range(1, 1 + total_num):
         step, won, samples = self_play(model, i, **mcts_config)
         buffer.extend(samples)
         stat.update(won, step)
 
         if i % train_interval == 0:
-            stat.log()
+            print(8888888, time.time() - start)
+            # stat.log()
             model.train_model(
                 buffer, epochs=2000, batch_size=128, log_interval=100,
                 value_coef=0.4, entropy_coef=0.0, save_path=model_path)

@@ -31,6 +31,7 @@ class Alpha0Module(torch.nn.Module):
     ):
         super(Alpha0Module, self).__init__()
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        print("42348328947934", self.device)
         self.global_step = 0
 
         # backbone: 输入 [B, 2, H, W] 输出 [B, 128, H, W]
