@@ -19,7 +19,7 @@ class BasePlayer:
     def search(self) -> Move:  # myself
         pass
 
-    def observe(self, move: Move):  # opponent_move
+    def observe(self, game: Game):  # opponent_move
         pass
 
 
@@ -72,9 +72,9 @@ class MCTSPlayer(BasePlayer):
         #     print("\tssss2-ch", ch.game.last_move, ch.N)
         return move
 
-    def observe(self, move: Move):
+    def observe(self, game: Game):
         # print("oooo1", self.tree.root.N, self.tree.root.game.last_move)
-        self.tree.reuse(move)
+        self.tree.reuse(game)
         # print("oooo2", move, self.tree.root.N, self.tree.root.game.last_move)
 
 
@@ -130,7 +130,7 @@ def self_play(game: Game, player: MCTSPlayer, force_center: bool = False):
             trajectory["turns"].append(game.player)
 
         game.do_move(move)
-        player.observe(move)
+        player.observe(game)
 
         pbar.update(1)
         pbar.set_postfix({"step": step, "player": 3 - game.player})
@@ -140,7 +140,6 @@ def self_play(game: Game, player: MCTSPlayer, force_center: bool = False):
     if game.result == Win:
         winner = 3 - game.player
         z = [torch.tensor(1.0 if p == winner else -1.0, dtype=torch.float) for p in trajectory["turns"]]
-        # print(f"[Result] Player {winner} Win")
     else:  # draw
         winner = 0
         z = [torch.tensor(0.0) for _ in trajectory["turns"]]
@@ -167,8 +166,8 @@ def eval_play(game: Game, player1: MCTSPlayer, player2: MCTSPlayer):
 
         move = player.search()
         game.do_move(move)
-        player.observe(move)
-        opponent.observe(move)
+        player.observe(game)
+        opponent.observe(game)
 
     if game.result == Win:
         winner = 3 - game.player
@@ -199,8 +198,8 @@ def play(game: Game, player1: BasePlayer, player2: BasePlayer, render: "Renderer
         move = player.search()
         game.do_move(move)
 
-        player.observe(move)
-        opponent.observe(move)
+        player.observe(game)
+        opponent.observe(game)
         render.draw_game(game)
 
     # end

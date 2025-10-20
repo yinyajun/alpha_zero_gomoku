@@ -1,9 +1,8 @@
 import math
-import time
-
 import torch
 import numpy as np
 from typing import Optional
+import torch.nn.functional as F
 
 from game import Game, Move, Win
 
@@ -24,8 +23,8 @@ class TreeNode:
         self.children: list[TreeNode] = []
 
         # lazy calculate
-        self.priors: Optional[np.ndarray] = None  # P(s,a) 先验概率（来自策略网络的输出)
-        self.value: Optional[float] = None  # 当前棋面的价值(来自价值网络的输出)
+        self.priors: Optional[np.ndarray] = None  # P(s,a) 动作先验概率（来自策略网络的输出)
+        self.value: Optional[float] = None  # V(s) 当前棋面的价值(来自价值网络的输出)
 
         self.N = 0  # N(s,a) 动作访问次数
         self.W = 0.0  # W(s,a) 累计价值总和
@@ -50,9 +49,9 @@ class TreeNode:
             return
 
         # 非终局，跑模型计算，value的值域[-1, 1]
-        state = self.game.get_state()
+        state = self.game.get_state()  # [2, h, w]  cpu
         mask = torch.from_numpy(self.game.board.flatten() != 0).bool()  # 非空位的mask
-        policy_out, value_out = self.policy_value_fn(state, mask)
+        policy_out, value_out = self.policy_value_fn(state, mask)  # 返回cpu张量
 
         self.priors = policy_out.numpy().astype(np.float32)
         self.value = float(value_out.item())
@@ -112,10 +111,12 @@ class TreeNode:
             node = node.parent
 
 
+
+
+
 class MCTSTree:
     def __init__(self, game: Game, policy_value_fn):
         self.root = TreeNode(game, policy_value_fn)
-        self.move_num = 0
 
     def add_noise(self, noise_eps: float, dirichlet_alpha: float):
         """
@@ -154,10 +155,8 @@ class MCTSTree:
             dirichlet_alpha: float,
     ) -> Move:
 
-        if self.move_num < noise_moves:
+        if self.root.game.move_count < noise_moves:
             self.add_noise(noise_eps, dirichlet_alpha)
-
-        start = time.time()
 
         for _ in range(iterations):
 
@@ -176,14 +175,13 @@ class MCTSTree:
             # 4) Backprop
             node.backprop(result)
 
-        # print(3333, time.time() - start, iterations)
-
         # get move
         assert self.root.children
         visits = np.array([ch.N for ch in self.root.children], dtype=np.float32)
 
-        if self.move_num >= warm_moves:
+        if self.root.game.move_count >= warm_moves:
             tau = 0.0
+
         if tau <= 0:
             idx = int(np.argmax(visits))
         else:
@@ -194,23 +192,25 @@ class MCTSTree:
             idx = np.random.choice(len(self.root.children), p=probs)
 
         chosen = self.root.children[idx].game.last_move
-        self.move_num += 1
         return chosen
 
-    def reuse(self, move: Move):
+    def reuse(self, game: Game):
         """
-        在对局进行中复用搜索树
+        在对局进行中复用搜索树（当last_move已经作用在棋盘后使用该函数）
         """
+        game = game.clone()
+        last_move = game.last_move
 
         # 尝试在现有孩子里找到这步棋
         for ch in self.root.children:
-            if ch.game.last_move == move:
+            if ch.game.last_move == last_move:
                 ch.parent = None
+                self.root.children = []
                 self.root = ch
                 return
 
         # 没找到: 新建根
-        self.root = TreeNode(self.root.game.clone(), self.root.policy_value_fn)  # 确保move已经落下
+        self.root = TreeNode(game, self.root.policy_value_fn)
 
     @property
     def search_prob(self):

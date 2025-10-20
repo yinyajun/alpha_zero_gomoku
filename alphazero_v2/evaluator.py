@@ -5,6 +5,23 @@ import threading
 import torch.nn.functional as F
 
 
+class DefaultPolicyValueFn:
+    def __init__(self, model):
+        self.model = model
+
+    def run(self, state, mask):
+        state = state.unsqueeze(0)  # [1,2,h,w]
+        with torch.no_grad():
+            state = state.to(self.model.device)
+            policy_out, value_out = self.model(state)
+
+        policy_out = policy_out[0].detach().cpu()
+        value_out = value_out.detach().cpu()
+        policy_out = policy_out.masked_fill(mask, -1e9)
+        policy_out = F.softmax(policy_out, dim=-1)
+        return policy_out, value_out
+
+
 class Evaluator:
     """
     达到 batch_size 或超时 timeout_ms，才真正计算

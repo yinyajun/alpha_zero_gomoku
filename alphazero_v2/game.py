@@ -12,7 +12,7 @@ Player2 = 2  # 玩家2落子
 
 # 棋盘终结状态
 Unfinished = 0  # 未终局
-Win = 1  # 胜
+Win = 1  # 有人获胜
 Draw = 2  # 平局
 
 
@@ -22,16 +22,16 @@ class Game:
 
     def __init__(self, first_player: int = Player1):
         self.board = np.zeros((self.size, self.size), dtype=np.int8)  # 0=空, 1/2=玩家
-        self.move_count = 0
-        self.player = first_player
-        self.last_move = None
-        self.result = Unfinished
+        self.move_count = 0  # 落子数
+        self.player = first_player  # 当前玩家
+        self.last_move = None  # 上一手
+        self.result = Unfinished  # 当前棋盘终结状态
 
     @staticmethod
     def is_legal_move(i: int, j: int) -> bool:
         return 0 <= i < Game.size and 0 <= j < Game.size
 
-    def feasible_moves(self) -> list[Move]:
+    def feasible_moves(self) -> list[Move]:  # 可落子位置
         ii, jj = np.where(self.board == 0)
         return list(zip(ii.tolist(), jj.tolist()))
 
