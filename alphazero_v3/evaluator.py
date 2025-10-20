@@ -14,8 +14,7 @@ class DefaultPolicyValueFn:
         k = time.time()
 
         with torch.no_grad():
-            state = state.to(self.model.device)
-            policy_out, value_out = self.model(state)
+            policy_out, value_out = self.model(state.to(self.model.device))
 
         print(44444444444, time.time() - k)
 

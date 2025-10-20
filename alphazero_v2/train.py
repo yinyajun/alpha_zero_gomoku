@@ -119,29 +119,23 @@ def train(conf: TrainConfig):
     # wandb.define_metric("selfplay/agg/*", step_metric="selfplay/episode")
     # wandb.define_metric("train/step")
     # wandb.define_metric("train/*", step_metric="train/step")
+    player = MCTSPlayer(
+        policy_value_fn=build_pv_fn2(evaluator),
+        iterations=conf.iterations,
+        c_puct=conf.c_puct,
+        warm_moves=conf.warm_moves,
+        tau=conf.tau,
+        noise_moves=conf.noise_moves,
+        noise_eps=conf.noise_eps,
+        dirichlet_alpha=conf.dirichlet_alpha,
+    )
 
     for i in range(1, 1 + conf.total_round, conf.collect_round):
 
-        # === A) 收集阶段：并发跑自我对弈 ===
-        def collect_one(round: int):
-            game = Game()
-            player = MCTSPlayer(
-                policy_value_fn=build_pv_fn2(evaluator),
-                iterations=conf.iterations,
-                c_puct=conf.c_puct,
-                warm_moves=conf.warm_moves,
-                tau=conf.tau,
-                noise_moves=conf.noise_moves,
-                noise_eps=conf.noise_eps,
-                dirichlet_alpha=conf.dirichlet_alpha,
-            )
-            force_center = round < conf.center_round
-            step, winner, trajectory = self_play(game, player, force_center=force_center)
-            return step, winner, trajectory
-
+        # === A) 收集阶段：自我对弈 ===
         rounds = range(i, i + conf.collect_round)
         for r in rounds:
-            step, winner, trajectory = collect_one(r)
+            step, winner, trajectory = self_play(Game(), player, force_center=r < conf.center_round)
             buffer.add_trajectory(trajectory)
 
         # === B) 训练阶段 ===
@@ -215,3 +209,4 @@ def train3(conf: TrainConfig):
 
 if __name__ == '__main__':
     train3(conf=TrainConfig())
+    # train(conf=TrainConfig())

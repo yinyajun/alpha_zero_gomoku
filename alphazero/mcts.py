@@ -71,7 +71,7 @@ class MCTSNode:
 
         with torch.no_grad():
             policy_out, value_out = self.model(s.to(self.model.device))
-        # print(222222222, time.time()-k)
+        print(222222222, time.time()-k)
 
         policy_out = policy_out[0].detach().to("cpu")
         value_out = value_out.item()
