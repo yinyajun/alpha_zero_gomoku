@@ -31,7 +31,6 @@ class Alpha0Module(torch.nn.Module):
     ):
         super(Alpha0Module, self).__init__()
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        print("42348328947934", self.device)
         self.global_step = 0
 
         # backbone: 输入 [B, 2, H, W] 输出 [B, 128, H, W]
@@ -41,8 +40,8 @@ class Alpha0Module(torch.nn.Module):
         self.conv2 = nn.Conv2d(64, 128, kernel_size=(3, 3), padding=1)
         self.bn2 = nn.BatchNorm2d(128)
         self.res2 = ResidualBlock(128)
-        self.res3 = ResidualBlock(128)
-        self.res4 = ResidualBlock(128)
+        #self.res3 = ResidualBlock(128)
+        #self.res4 = ResidualBlock(128)
 
         # policy head: 输出 [B, H, W]
         self.policy_conv1 = nn.Conv2d(128, 64, kernel_size=(1, 1))
@@ -77,8 +76,8 @@ class Alpha0Module(torch.nn.Module):
         x = self.res1(x)
         x = self.relu(self.bn2(self.conv2(x)))  # [B, 128, H, W]
         x = self.res2(x)
-        x = self.res3(x)
-        x = self.res4(x)
+        #x = self.res3(x)
+        #x = self.res4(x)
 
         # policy head
         p = self.relu(self.policy_bn1(self.policy_conv1(x)))  # [B, 64, H, W]

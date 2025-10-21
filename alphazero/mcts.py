@@ -64,14 +64,13 @@ class MCTSNode:
             self.value = -1.0 if self.end == 1 else 0.0  # 上一手胜 => 我方输 => -1；平 => 0
             return
 
-
         # 非终局，跑模型计算，value的值域[-1, 1]
         s = self.state.get_state(self.player).unsqueeze(0)
-        k = time.time()
+        k = time.time_ns()
 
         with torch.no_grad():
             policy_out, value_out = self.model(s.to(self.model.device))
-        print(222222222, time.time()-k)
+        # print(66666666, time.time_ns() - k)
 
         policy_out = policy_out[0].detach().to("cpu")
         value_out = value_out.item()
@@ -197,26 +196,33 @@ class MCTSNode:
         return chosen, stats
 
     def search(self, iterations: int = 500, c: float = 0.3):
-        start = time.time()
+
+        t1, t2, t3, t4 = 0, 0, 0, 0
         for _ in range(iterations):
+            start = time.time()
 
             # 1) Selection
             node = self
             while not node.is_terminal() and node.is_fully_expanded():  # 已经完全展开，并且没有终局，select最佳child
                 node = node.best_child(c)
 
+            t1 += (time.time() - start)
+
+            start = time.time()
             # 2) Expansion
             if not node.is_terminal():  # is_terminal() or not is_fully_expanded()
                 node = node.expand()
+            t2 += (time.time() - start)
 
+            start = time.time()
             # 3) Rollout
             result = node.rollout()
+            t3 += (time.time() - start)
 
+            start = time.time()
             # 4) Backprop
             node.backprop(result)
-
-
-        # print(333, time.time() - start, iterations)
+            t4 += (time.time() - start)
 
 
 def mcts_build(

@@ -1,3 +1,5 @@
+import time
+
 import wandb
 import torch
 from tqdm import tqdm
@@ -38,7 +40,7 @@ class TrainConfig:
     # train
     center_round: int = 200
     total_round: int = 50000
-    collect_round: int = 5
+    collect_round: int = 10
     collect_actors: int = 5
     eval_batch: int = 10
     eval_timeout_ms: float = 0.1
@@ -48,7 +50,7 @@ def train3(conf: TrainConfig):
     """两阶段同步训练"""
     model = Alpha0Module(lr=conf.lr, weight_decay=conf.weight_decay, resume_path=conf.resume_model_path)
     buffer = ReplayBuffer(capacity=50_000, resume_path=conf.resume_buffer_path)
-    fn = DefaultPolicyValueFn(model=model).run
+    # fn = DefaultPolicyValueFn(model=model).run
     # wandb.init(project=f"alpha_zero_gomoku",
     #            name=f"run-{datetime.now().strftime('%Y%m%d-%H%M')}",
     #            config=asdict(conf))
@@ -59,7 +61,7 @@ def train3(conf: TrainConfig):
     # wandb.define_metric("train/*", step_metric="train/step")
 
     player = MCTSPlayer(
-        policy_value_fn=fn,
+        model=model,
         iterations=conf.iterations,
         c_puct=conf.c_puct,
         warm_moves=conf.warm_moves,

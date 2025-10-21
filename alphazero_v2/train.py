@@ -1,3 +1,5 @@
+import time
+
 import wandb
 import torch
 from tqdm import tqdm
@@ -38,10 +40,11 @@ class TrainConfig:
     # train
     center_round: int = 200
     total_round: int = 50000
-    collect_round: int = 5
-    collect_actors: int = 5
-    eval_batch: int = 10
-    eval_timeout_ms: float = 0.1
+    collect_round: int = 10
+    collect_actors: int = 10
+    # inference
+    eval_batch: int = 5
+    eval_timeout_ms: float = 0.01
 
 
 def train2(conf: TrainConfig):
@@ -60,11 +63,12 @@ def train2(conf: TrainConfig):
     # wandb.define_metric("train/step")
     # wandb.define_metric("train/*", step_metric="train/step")
 
+
     for i in range(1, 1 + conf.total_round, conf.collect_round):
+        start = time.time()
 
         # === A) 收集阶段：并发跑自我对弈 ===
         def collect_one(round: int):
-            game = Game()
             player = MCTSPlayer(
                 policy_value_fn=fn,
                 iterations=conf.iterations,
@@ -75,8 +79,7 @@ def train2(conf: TrainConfig):
                 noise_eps=conf.noise_eps,
                 dirichlet_alpha=conf.dirichlet_alpha,
             )
-            force_center = round < conf.center_round
-            step, winner, trajectory = self_play(game, player, force_center=force_center)
+            step, winner, trajectory = self_play(Game(), player, force_center=round < conf.center_round)
             return step, winner, trajectory
 
         rounds = range(i, i + conf.collect_round)
@@ -86,6 +89,8 @@ def train2(conf: TrainConfig):
             for fut in tqdm(futures, desc="collecting", unit="round"):
                 step, winner, trajectory = fut.result()
                 buffer.add_trajectory(trajectory)
+
+        print(777777, time.time() - start)
 
         # === B) 训练阶段 ===
         model_path = "model.pt"
@@ -184,11 +189,15 @@ def train3(conf: TrainConfig):
 
     for i in range(1, 1 + conf.total_round, conf.collect_round):
 
+        start = time.time()
+
         # === A) 收集阶段：自我对弈 ===
         rounds = range(i, i + conf.collect_round)
         for r in rounds:
             step, winner, trajectory = self_play(Game(), player, force_center=r < conf.center_round)
             buffer.add_trajectory(trajectory)
+
+        print(777778, time.time() - start)
 
         # === B) 训练阶段 ===
         model_path = "model.pt"
@@ -208,5 +217,6 @@ def train3(conf: TrainConfig):
 
 
 if __name__ == '__main__':
-    train3(conf=TrainConfig())
+    # train3(conf=TrainConfig())
     # train(conf=TrainConfig())
+    train2(conf=TrainConfig())

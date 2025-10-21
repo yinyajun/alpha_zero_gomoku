@@ -52,11 +52,11 @@ class TreeNode:
 
         # 非终局，跑模型计算，value的值域[-1, 1]
         state = self.game.get_state().unsqueeze(0)
-        k = time.time()
+        k = time.time_ns()
         with torch.no_grad():
             policy_out, value_out = self.model(state.to(self.model.device))
 
-        print(66666666, time.time() - k)
+        # print(66666666, time.time_ns() - k)
 
         policy_out = policy_out[0].detach().to("cpu")
         value_out = value_out.item()
@@ -123,8 +123,8 @@ class TreeNode:
 
 
 class MCTSTree:
-    def __init__(self, game: Game, policy_value_fn):
-        self.root = TreeNode(game, policy_value_fn)
+    def __init__(self, game: Game, model):
+        self.root = TreeNode(game, model)
 
     def add_noise(self, noise_eps: float, dirichlet_alpha: float):
         """
@@ -166,22 +166,35 @@ class MCTSTree:
         if self.root.game.move_count < noise_moves:
             self.add_noise(noise_eps, dirichlet_alpha)
 
+        t1,t2,t3,t4 = 0,0,0,0
         for _ in range(iterations):
+            start = time.time()
 
             # 1) Selection
             node = self.root
             while not node.is_terminal() and node.is_fully_expanded():  # 已经完全展开，并且没有终局，select最佳child
                 node = node.select(c_puct)
+            t1 += (time.time() - start)
 
+            start = time.time()
             # 2) Expansion
             if not node.is_terminal():  # not is_fully_expanded()
                 node = node.expand()
 
+            t2 += (time.time() - start)
+            start = time.time()
+
             # 3) Rollout
             result = node.rollout()
+            t3 += (time.time() - start)
+
+            start = time.time()
 
             # 4) Backprop
             node.backprop(result)
+            t4 += (time.time() - start)
+
+        # print(9999999999, iterations, t1, t2,t3,t4)
 
         # get move
         assert self.root.children
@@ -218,7 +231,7 @@ class MCTSTree:
                 return
 
         # 没找到: 新建根
-        self.root = TreeNode(game, self.root.policy_value_fn)
+        self.root = TreeNode(game, self.root.model)
 
     @property
     def search_prob(self):

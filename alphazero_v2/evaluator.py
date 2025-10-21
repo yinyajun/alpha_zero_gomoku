@@ -17,7 +17,7 @@ class DefaultPolicyValueFn:
             state = state.to(self.model.device)
             policy_out, value_out = self.model(state)
 
-        print(44444444444, time.time() - k)
+        # print(44444444444, time.time() - k)
 
         policy_out = policy_out[0].detach().cpu()
         value_out = value_out.detach().cpu()

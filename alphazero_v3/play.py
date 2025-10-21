@@ -30,7 +30,7 @@ class MCTSPlayer(BasePlayer):
 
     def __init__(
             self,
-            policy_value_fn,
+            model,
             iterations: int,
             c_puct: float,
             warm_moves: int,
@@ -41,7 +41,7 @@ class MCTSPlayer(BasePlayer):
     ):
         super(MCTSPlayer, self).__init__()
         self.tree = None
-        self.policy_value_fn = policy_value_fn
+        self.model = model
         self.iterations = iterations
         self.c_puct = c_puct
         self.warm_moves = warm_moves
@@ -52,7 +52,7 @@ class MCTSPlayer(BasePlayer):
 
     def prepare(self, game: Game) -> "MCTSPlayer":
         super(MCTSPlayer, self).prepare(game)
-        self.tree: MCTSTree = MCTSTree(game, self.policy_value_fn)
+        self.tree: MCTSTree = MCTSTree(game, self.model)
         return self
 
     def search_move(self):
@@ -218,7 +218,7 @@ if __name__ == '__main__':
 
     p1 = HumanPlayer(r)
     p2 = MCTSPlayer(
-        policy_value_fn=build_pv_fn(evaluator),
+        model=build_pv_fn(evaluator),
         iterations=600,
         c_puct=0.5,
         warm_moves=6,
