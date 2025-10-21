@@ -166,7 +166,7 @@ class MCTSTree:
         if self.root.game.move_count < noise_moves:
             self.add_noise(noise_eps, dirichlet_alpha)
 
-        t1,t2,t3,t4 = 0,0,0,0
+        t1, t2, t3, t4 = 0, 0, 0, 0
         for _ in range(iterations):
             start = time.time()
 
