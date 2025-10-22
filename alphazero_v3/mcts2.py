@@ -15,17 +15,13 @@ class TreeNode:
       - Backprop:  将结果回传
     """
 
-    def __init__(self, game: Game, pv_fn, parent: Optional["TreeNode"] = None):
+    def __init__(self, game: Game, pv_fn, prior: float, parent: Optional["TreeNode"] = None):
         self.game = game
         self.parent = parent
         self.children = {}  # move -> TreeNode
         self.pv_fn = pv_fn
         self.untried_moves = self.game.available_moves()
-
-        # lazy calculate
-        self.p:Optional[float] = None
-        self.priors: Optional[np.ndarray] = None  # P(s,a) 动作先验概率（来自策略网络的输出)
-        self.value: Optional[float] = None  # V(s) 当前棋面的价值(来自价值网络的输出)
+        self.p: Optional[float] = prior
 
         # 统计量
         self.N = 0  # N(s,a) 动作访问次数
@@ -39,14 +35,8 @@ class TreeNode:
         return len(self.untried_moves) == 0
 
     def ensure_priors_and_value(self):
-        # 终局直接返回，非终局用模型的价值预估
-        if self.priors is not None:  # 已经计算过
-            return
-
         if self.is_terminal():
-            self.priors = np.zeros(Game.size * Game.size, dtype=np.float32)
-            self.value = 0.0 if self.game.winner == Nobody else -1.0  # 上一手胜 => 我方输 => -1；平 => 0
-            return
+            return None
 
         # 非终局，跑模型计算，value的值域[-1, 1]
         state = self.game.get_state()  # [2, h, w]  cpu
@@ -73,13 +63,13 @@ class TreeNode:
         if len(self.children) > 0:
             return
 
-        self.ensure_priors_and_value()
+        priors, value = self.ensure_priors_and_value()
         for move in self.untried_moves:
+            p = priors[move[0] * Game.size + move[1]]
             game = self.game.clone()
             game.step(move)
-            self.children[move] = TreeNode(game, self.pv_fn, parent=self)
-
-        return
+            self.children[move] = TreeNode(game, self.pv_fn, prior=p, parent=self)
+        return value
 
     def rollout(self) -> float:
         """
@@ -107,9 +97,8 @@ class TreeNode:
         # is_terminal or not is_fully_expanded()
         if not node.is_terminal():
             v = node.expand_all()
-
-        # 3) Rollout
-        v = node.rollout()
+        else:
+            v = node.rollout()
 
         # 4) Backprop
         node.backprop(v)
