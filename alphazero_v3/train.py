@@ -80,14 +80,14 @@ def parallel_train(conf: TrainConfig):
     print("同步并行训练")
     model = Alpha0Module(lr=conf.lr, weight_decay=conf.weight_decay, resume_path=conf.resume_model_path)
     buffer = ReplayBuffer(capacity=50_000, resume_path=conf.resume_buffer_path)
-    pv_fn = build_pv_fn_batch(model, max_batch_size=10, max_timeout_ms=0.015)
+    pv_fn = build_pv_fn_batch(model, max_batch_size=10, max_timeout_ms=0.04)
     metric = PlayMetric()
 
     wandb.init(
         project=f"alpha_zero_gomoku",
         name=f"run-{datetime.now().strftime('%Y%m%d-%H%M')}",
         config=asdict(conf),
-        mode="disabled"
+        # mode="disabled"
     )
     wandb.define_metric("selfplay/episode")
     wandb.define_metric("selfplay/*", step_metric="selfplay/episode")
@@ -162,7 +162,7 @@ def train(conf: TrainConfig):
         project=f"alpha_zero_gomoku",
         name=f"run-{datetime.now().strftime('%Y%m%d-%H%M')}",
         config=asdict(conf),
-        mode="disabled"
+        # mode="disabled"
     )
     wandb.define_metric("selfplay/episode")
     wandb.define_metric("selfplay/*", step_metric="selfplay/episode")
