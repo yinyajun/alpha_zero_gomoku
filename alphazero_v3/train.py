@@ -42,8 +42,7 @@ class PlayMetric:
             "selfplay/agg/draw_rate": self.cnt_draw / self.play_num,
             "selfplay/agg/avg_steps": round(self.total_steps / self.play_num, 2),
         }
-        wandb.log(record)
-        print(record)
+        return record
 
 
 @dataclass
@@ -118,12 +117,17 @@ def parallel_train(conf: TrainConfig):
 
         rounds = range(i, i + conf.collect_round)
 
+        metrics = []
         with ThreadPoolExecutor(max_workers=conf.collect_actors) as executor:
             futures = [executor.submit(collect_one, r) for r in rounds]
             for fut in tqdm(futures, desc="Collecting", unit="round"):
                 step, winner, trajectory = fut.result()
-                metric.update(winner, step)
                 buffer.add_trajectory(trajectory)
+                metrics.append(metric.update(winner, step))
+
+        for r in metrics:
+            print(r)
+            wandb.log(r)
 
         print(f"[Collect] consume: {time.time() - start: .2f}sec, rounds: {len(rounds)}")
 
@@ -159,7 +163,6 @@ def train(conf: TrainConfig):
         name=f"run-{datetime.now().strftime('%Y%m%d-%H%M')}",
         config=asdict(conf),
         mode="disabled"
-
     )
     wandb.define_metric("selfplay/episode")
     wandb.define_metric("selfplay/*", step_metric="selfplay/episode")
@@ -187,8 +190,10 @@ def train(conf: TrainConfig):
         rounds = range(i, i + conf.collect_round)
         for r in rounds:
             step, winner, trajectory = self_play(Game(), player, force_center=r < conf.center_round)
-            metric.update(winner, step)
             buffer.add_trajectory(trajectory)
+            record = metric.update(winner, step)
+            print(record)
+            wandb.log(record)
 
         print(f"[Collect] consume: {time.time() - start: .2f}sec, rounds: {len(rounds)}")
 
