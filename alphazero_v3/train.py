@@ -7,11 +7,41 @@ from tqdm import tqdm
 from dataclasses import dataclass, asdict
 from concurrent.futures import ThreadPoolExecutor
 
-from game import Game
+from game import Game, Player1, Player2
 from model import Alpha0Module
 from evaluator import BatchEvaluator, build_pv_fn, build_pv_fn_batch
 from buffer import ReplayBuffer
 from play import self_play, MCTSPlayer
+
+
+@dataclass
+class PlayMetric:
+    cnt_p1: int = 0
+    cnt_p2: int = 0
+    cnt_draw: int = 0
+    total_steps: int = 0
+    play_num: int = 0
+
+    def update(self, winner: int, step: int):
+        self.play_num += 1
+        if winner == Player1:
+            self.cnt_p1 += 1
+            self.total_steps += step
+        elif winner == Player2:
+            self.cnt_p2 += 1
+            self.total_steps += step
+        elif winner == 0:
+            self.cnt_draw += 1
+            self.total_steps += step
+
+        wandb.log({
+            "selfplay/episode": self.play_num,
+            "selfplay/episode_length": step,
+            "selfplay/agg/p1_win_rate": round(self.cnt_p1 / self.play_num, 2),
+            "selfplay/agg/p2_win_rate": round(self.cnt_p2 / self.play_num, 2),
+            "selfplay/agg/draw_rate": self.cnt_draw / self.play_num,
+            "selfplay/agg/avg_steps": round(self.total_steps / self.play_num, 2),
+        })
 
 
 @dataclass
@@ -50,12 +80,13 @@ def parallel_train(conf: TrainConfig):
     model = Alpha0Module(lr=conf.lr, weight_decay=conf.weight_decay, resume_path=conf.resume_model_path)
     buffer = ReplayBuffer(capacity=50_000, resume_path=conf.resume_buffer_path)
     pv_fn = build_pv_fn_batch(model, max_batch_size=10, max_timeout_ms=0.015)
+    metric = PlayMetric()
 
     wandb.init(
         project=f"alpha_zero_gomoku",
         name=f"run-{datetime.now().strftime('%Y%m%d-%H%M')}",
         config=asdict(conf),
-        mode="disabled"
+        # mode="disabled"
     )
     wandb.define_metric("selfplay/episode")
     wandb.define_metric("selfplay/*", step_metric="selfplay/episode")
@@ -89,6 +120,7 @@ def parallel_train(conf: TrainConfig):
             futures = [executor.submit(collect_one, r) for r in rounds]
             for fut in tqdm(futures, desc="Collecting", unit="round"):
                 step, winner, trajectory = fut.result()
+                metric.update(winner, step)
                 buffer.add_trajectory(trajectory)
 
         print(f"[Collect] consume: {time.time() - start: .2f}sec, rounds: {len(rounds)}")
@@ -118,11 +150,13 @@ def train(conf: TrainConfig):
     model = Alpha0Module(lr=conf.lr, weight_decay=conf.weight_decay, resume_path=conf.resume_model_path)
     buffer = ReplayBuffer(capacity=50_000, resume_path=conf.resume_buffer_path)
     pv_fn = build_pv_fn(model)
+    metric = PlayMetric()
+
     wandb.init(
         project=f"alpha_zero_gomoku",
         name=f"run-{datetime.now().strftime('%Y%m%d-%H%M')}",
         config=asdict(conf),
-        mode="disabled"
+        # mode="disabled"
 
     )
     wandb.define_metric("selfplay/episode")
@@ -151,6 +185,7 @@ def train(conf: TrainConfig):
         rounds = range(i, i + conf.collect_round)
         for r in rounds:
             step, winner, trajectory = self_play(Game(), player, force_center=r < conf.center_round)
+            metric.update(winner, step)
             buffer.add_trajectory(trajectory)
 
         print(f"[Collect] consume: {time.time() - start: .2f}sec, rounds: {len(rounds)}")
