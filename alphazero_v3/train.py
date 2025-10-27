@@ -51,12 +51,12 @@ class TrainConfig:
     board_size: int = Game.size
     win_num: int = Game.win_num
     # mcts
-    iterations: int = 300
+    iterations: int = 490
     c_puct: float = 0.5
-    noise_moves: int = 5
+    noise_moves: int = 7
     noise_eps: float = 0.25
-    dirichlet_alpha: float = 0.20  # # 10/board_size
-    warm_moves: int = 6
+    dirichlet_alpha: float = 0.123  # # 10/board_size
+    warm_moves: int = 11
     tau: float = 1.0
     # model_train
     resume_model_path: str = None
