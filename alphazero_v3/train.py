@@ -223,5 +223,6 @@ if __name__ == '__main__':
 
     conf = TrainConfig()
     print(conf)
+
     # train(conf=conf)
     parallel_train(conf=TrainConfig())
