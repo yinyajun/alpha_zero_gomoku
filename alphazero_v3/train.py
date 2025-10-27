@@ -34,14 +34,16 @@ class PlayMetric:
             self.cnt_draw += 1
             self.total_steps += step
 
-        wandb.log({
+        record = {
             "selfplay/episode": self.play_num,
             "selfplay/episode_length": step,
             "selfplay/agg/p1_win_rate": round(self.cnt_p1 / self.play_num, 2),
             "selfplay/agg/p2_win_rate": round(self.cnt_p2 / self.play_num, 2),
             "selfplay/agg/draw_rate": self.cnt_draw / self.play_num,
             "selfplay/agg/avg_steps": round(self.total_steps / self.play_num, 2),
-        })
+        }
+        wandb.log(record)
+        print(record)
 
 
 @dataclass
@@ -86,7 +88,7 @@ def parallel_train(conf: TrainConfig):
         project=f"alpha_zero_gomoku",
         name=f"run-{datetime.now().strftime('%Y%m%d-%H%M')}",
         config=asdict(conf),
-        # mode="disabled"
+        mode="disabled"
     )
     wandb.define_metric("selfplay/episode")
     wandb.define_metric("selfplay/*", step_metric="selfplay/episode")
@@ -156,7 +158,7 @@ def train(conf: TrainConfig):
         project=f"alpha_zero_gomoku",
         name=f"run-{datetime.now().strftime('%Y%m%d-%H%M')}",
         config=asdict(conf),
-        # mode="disabled"
+        mode="disabled"
 
     )
     wandb.define_metric("selfplay/episode")
