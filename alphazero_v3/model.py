@@ -153,8 +153,9 @@ class Alpha0Module(torch.nn.Module):
                     "train/step": self.global_step,
                 }
                 wandb.log(log_dict)
-                print(f"[Train-{self.global_step}] {log_dict} consume: {time.time() - start: .2f} sec")
+                print(f"[Train-{self.global_step}] {log_dict}")
 
+        print(f"[Train] consume: {time.time() - start: .2f} sec, epochs: {epochs}")
         self.eval()
 
     def save_checkpoint(self, path: str):

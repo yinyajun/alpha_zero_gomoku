@@ -40,7 +40,7 @@ class TrainConfig:
     # train
     center_round: int = 200
     total_round: int = 50000
-    collect_round: int = 10
+    collect_round: int = 5
     collect_actors: int = 10
 
 
@@ -156,8 +156,8 @@ def train(conf: TrainConfig):
         print(f"[Collect] consume: {time.time() - start: .2f}sec, rounds: {len(rounds)}")
 
         # === B) 训练阶段 ===
-        model_path = "model.pt"
-        buffer_path = "buffer.pt"
+        model_path = f"output/model_{i}.pt"
+        buffer_path = f"output/buffer_{i}.pt"
         model.train_model(
             buffer,
             epochs=conf.train_epochs,
