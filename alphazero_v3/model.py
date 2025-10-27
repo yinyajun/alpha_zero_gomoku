@@ -141,13 +141,13 @@ class Alpha0Module(torch.nn.Module):
 
             if epoch % log_interval == 0:
                 log_dict = {
-                    "train/loss_total": loss.item(),
-                    "train/loss_policy": policy_loss.item(),
-                    "train/loss_value": value_loss.item(),
-                    "train/entropy": entropy.item(),
-                    "train/target_entropy": target_entropy.item(),
-                    "train/value_mae": value_mae.item(),
-                    "train/grad_norm": float(grad_norm.item()),
+                    "train/loss_total": round(loss.item(), 4),
+                    "train/loss_policy": round(policy_loss.item(), 4),
+                    "train/loss_value": round(value_loss.item(), 4),
+                    "train/entropy": round(entropy.item(), 4),
+                    "train/target_entropy": round(target_entropy.item(), 4),
+                    "train/value_mae": round(value_mae.item(), 4),
+                    "train/grad_norm": round(float(grad_norm.item()), 4),
                     "train/step": self.global_step,
                 }
                 if use_wandb:

@@ -5,7 +5,7 @@ import threading
 import numpy as np
 import torch.nn.functional as F
 
-from .model import Alpha0Module
+from model import Alpha0Module
 
 
 class SingleEvaluator:

@@ -1,5 +1,4 @@
 import time
-
 import wandb
 import torch
 from tqdm import tqdm
@@ -9,7 +8,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 from game import Game
 from model import Alpha0Module
-from evaluator import BatchEvaluator, build_pv_fn, build_pv_fn2, DefaultPolicyValueFn
+from evaluator import BatchEvaluator, build_pv_fn, build_pv_fn_batch
 from buffer import ReplayBuffer
 from play import self_play, MCTSPlayer
 
@@ -40,19 +39,15 @@ class TrainConfig:
     # train
     center_round: int = 200
     total_round: int = 50000
-    collect_round: int = 10
+    collect_round: int = 2
     collect_actors: int = 10
-    # inference
-    eval_batch: int = 5
-    eval_timeout_ms: float = 0.01
 
 
-def train2(conf: TrainConfig):
+def parallel_train(conf: TrainConfig, ):
     """两阶段同步训练"""
     model = Alpha0Module(lr=conf.lr, weight_decay=conf.weight_decay, resume_path=conf.resume_model_path)
     buffer = ReplayBuffer(capacity=50_000, resume_path=conf.resume_buffer_path)
-    evaluator = BatchEvaluator(model, max_batch_size=conf.eval_batch, max_timeout_ms=conf.eval_timeout_ms)
-    fn = build_pv_fn(evaluator)
+    pv_fn = build_pv_fn_batch(model, max_batch_size=5, max_timeout_ms=0.015)
 
     # wandb.init(project=f"alpha_zero_gomoku",
     #            name=f"run-{datetime.now().strftime('%Y%m%d-%H%M')}",
@@ -63,14 +58,13 @@ def train2(conf: TrainConfig):
     # wandb.define_metric("train/step")
     # wandb.define_metric("train/*", step_metric="train/step")
 
-
     for i in range(1, 1 + conf.total_round, conf.collect_round):
         start = time.time()
 
         # === A) 收集阶段：并发跑自我对弈 ===
         def collect_one(round: int):
             player = MCTSPlayer(
-                policy_value_fn=fn,
+                pv_fn=pv_fn,
                 iterations=conf.iterations,
                 c_puct=conf.c_puct,
                 warm_moves=conf.warm_moves,
@@ -86,11 +80,11 @@ def train2(conf: TrainConfig):
 
         with ThreadPoolExecutor(max_workers=conf.collect_actors) as executor:
             futures = [executor.submit(collect_one, r) for r in rounds]
-            for fut in tqdm(futures, desc="collecting", unit="round"):
+            for fut in tqdm(futures, desc="Collecting", unit="round"):
                 step, winner, trajectory = fut.result()
                 buffer.add_trajectory(trajectory)
 
-        print(777777, time.time() - start)
+        print(f"[Collect] consume: {time.time() - start: .2f}sec, rounds: {len(rounds)}")
 
         # === B) 训练阶段 ===
         model_path = "model.pt"
@@ -109,64 +103,64 @@ def train2(conf: TrainConfig):
         torch.cuda.empty_cache()
 
     # wandb.finish()
+
+
+# def train3333(conf: TrainConfig):
+#     """两阶段同步训练"""
+#     model = Alpha0Module(lr=conf.lr, weight_decay=conf.weight_decay, resume_path=conf.resume_model_path)
+#     buffer = ReplayBuffer(capacity=50_000, resume_path=conf.resume_buffer_path)
+#     evaluator = BatchEvaluator(model, max_batch_size=conf.eval_batch, max_timeout_ms=conf.eval_timeout_ms)
+#     # wandb.init(project=f"alpha_zero_gomoku",
+#     #            name=f"run-{datetime.now().strftime('%Y%m%d-%H%M')}",
+#     #            config=asdict(conf))
+#     # wandb.define_metric("selfplay/episode")
+#     # wandb.define_metric("selfplay/*", step_metric="selfplay/episode")
+#     # wandb.define_metric("selfplay/agg/*", step_metric="selfplay/episode")
+#     # wandb.define_metric("train/step")
+#     # wandb.define_metric("train/*", step_metric="train/step")
+#     player = MCTSPlayer(
+#         pv_fn=build_pv_fn2(evaluator),
+#         iterations=conf.iterations,
+#         c_puct=conf.c_puct,
+#         warm_moves=conf.warm_moves,
+#         tau=conf.tau,
+#         noise_moves=conf.noise_moves,
+#         noise_eps=conf.noise_eps,
+#         dirichlet_alpha=conf.dirichlet_alpha,
+#     )
+#
+#     for i in range(1, 1 + conf.total_round, conf.collect_round):
+#
+#         # === A) 收集阶段：自我对弈 ===
+#         rounds = range(i, i + conf.collect_round)
+#         for r in rounds:
+#             step, winner, trajectory = self_play(Game(), player, force_center=r < conf.center_round)
+#             buffer.add_trajectory(trajectory)
+#
+#         # === B) 训练阶段 ===
+#         model_path = "model.pt"
+#         buffer_path = "buffer.pt"
+#         model.train_model(
+#             buffer,
+#             epochs=conf.train_epochs,
+#             batch_size=conf.batch_size,
+#             log_interval=conf.log_interval,
+#             value_coef=conf.value_coef,
+#             entropy_coef=conf.entropy_coef,
+#         )
+#         model.save_checkpoint(model_path)
+#         buffer.save(buffer_path)
+#
+#         torch.cuda.empty_cache()
+#
+#     # wandb.finish()
 
 
 def train(conf: TrainConfig):
     """两阶段同步训练"""
     model = Alpha0Module(lr=conf.lr, weight_decay=conf.weight_decay, resume_path=conf.resume_model_path)
     buffer = ReplayBuffer(capacity=50_000, resume_path=conf.resume_buffer_path)
-    evaluator = BatchEvaluator(model, max_batch_size=conf.eval_batch, max_timeout_ms=conf.eval_timeout_ms)
-    # wandb.init(project=f"alpha_zero_gomoku",
-    #            name=f"run-{datetime.now().strftime('%Y%m%d-%H%M')}",
-    #            config=asdict(conf))
-    # wandb.define_metric("selfplay/episode")
-    # wandb.define_metric("selfplay/*", step_metric="selfplay/episode")
-    # wandb.define_metric("selfplay/agg/*", step_metric="selfplay/episode")
-    # wandb.define_metric("train/step")
-    # wandb.define_metric("train/*", step_metric="train/step")
-    player = MCTSPlayer(
-        policy_value_fn=build_pv_fn2(evaluator),
-        iterations=conf.iterations,
-        c_puct=conf.c_puct,
-        warm_moves=conf.warm_moves,
-        tau=conf.tau,
-        noise_moves=conf.noise_moves,
-        noise_eps=conf.noise_eps,
-        dirichlet_alpha=conf.dirichlet_alpha,
-    )
-
-    for i in range(1, 1 + conf.total_round, conf.collect_round):
-
-        # === A) 收集阶段：自我对弈 ===
-        rounds = range(i, i + conf.collect_round)
-        for r in rounds:
-            step, winner, trajectory = self_play(Game(), player, force_center=r < conf.center_round)
-            buffer.add_trajectory(trajectory)
-
-        # === B) 训练阶段 ===
-        model_path = "model.pt"
-        buffer_path = "buffer.pt"
-        model.train_model(
-            buffer,
-            epochs=conf.train_epochs,
-            batch_size=conf.batch_size,
-            log_interval=conf.log_interval,
-            value_coef=conf.value_coef,
-            entropy_coef=conf.entropy_coef,
-        )
-        model.save_checkpoint(model_path)
-        buffer.save(buffer_path)
-
-        torch.cuda.empty_cache()
-
-    # wandb.finish()
-
-
-def train3(conf: TrainConfig):
-    """两阶段同步训练"""
-    model = Alpha0Module(lr=conf.lr, weight_decay=conf.weight_decay, resume_path=conf.resume_model_path)
-    buffer = ReplayBuffer(capacity=50_000, resume_path=conf.resume_buffer_path)
-    fn = DefaultPolicyValueFn(model=model).predict
+    pv_fn = build_pv_fn(model)
     # wandb.init(project=f"alpha_zero_gomoku",
     #            name=f"run-{datetime.now().strftime('%Y%m%d-%H%M')}",
     #            config=asdict(conf))
@@ -177,7 +171,7 @@ def train3(conf: TrainConfig):
     # wandb.define_metric("train/*", step_metric="train/step")
 
     player = MCTSPlayer(
-        policy_value_fn=fn,
+        pv_fn=pv_fn,
         iterations=conf.iterations,
         c_puct=conf.c_puct,
         warm_moves=conf.warm_moves,
@@ -197,7 +191,7 @@ def train3(conf: TrainConfig):
             step, winner, trajectory = self_play(Game(), player, force_center=r < conf.center_round)
             buffer.add_trajectory(trajectory)
 
-        print(777778, time.time() - start)
+        print(f"[Collect] consume: {time.time() - start: .2f}sec, rounds: {len(rounds)}")
 
         # === B) 训练阶段 ===
         model_path = "model.pt"
@@ -217,6 +211,5 @@ def train3(conf: TrainConfig):
 
 
 if __name__ == '__main__':
-    # train3(conf=TrainConfig())
-    # train(conf=TrainConfig())
-    train2(conf=TrainConfig())
+    train(conf=TrainConfig())
+    # train_with_batch(conf=TrainConfig())

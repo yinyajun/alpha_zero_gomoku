@@ -1,6 +1,5 @@
 import pygame
-from game import Game
-from mcts import MCTSTree
+from game import Game, Player1
 
 cell_size = 40
 edge = int(1.5 * cell_size)
@@ -108,12 +107,12 @@ class Renderer:
                 cx, cy = self.centers[i][j]
                 pygame.draw.circle(self.screen, color, (bx + cx, by + cy), 14)
 
-    def draw_mcts_numbers(self, tree: MCTSTree):
+    def draw_mcts_numbers(self, tree: "MCTSTree"):
         """把 MCTS 的数值画到三个面板：value/visits/prior；node 为 None 则跳过。"""
         if tree is None:
             return
         size = self.size_n
-        priors = tree.root.priors
+        priors = tree.root.priors if hasattr(tree.root, "priors") else None
 
         bx1, by1 = self.panels[1].pos
         bx2, by2 = self.panels[2].pos
@@ -132,21 +131,21 @@ class Renderer:
             self.screen.blit(self.font.render(vis_str, True, black), (bx2 + ax, by2 + ay))
 
             # policy_out 面板=3
-            p_str = f"{priors[i * size + j]: .2f}"
+            p = priors[i * size + j] if priors else ch.P
+            p_str = f"{p: .2f}"
             self.screen.blit(self.font.render(p_str, True, black), (bx3 + ax, by3 + ay))
 
-    def draw_banner(self, player: int, end: int):
-        winner = 3 - player
-        color = "Black" if winner == 1 else "White"
-        bias = (edge, self.BOARD_H * 2 + 3 * edge)
-
-        if end == 1:
+    def draw_banner(self, player: int, winner: int, is_end: bool):
+        if is_end and winner > 0:
+            color = "Black" if winner == Player1 else "White"
             text = f"[Info] {color} win!"
-        elif end == 2:
+        elif is_end and winner == 0:
             text = "[Info] The game is draw"
         else:
-            text = f"[Info] Player {player}'s turn"
+            color = "Black" if player == Player1 else "White"
+            text = f"[Info] {color}'s turn"
 
+        bias = (edge, self.BOARD_H * 2 + 3 * edge)
         surf = self.font.render(text, True, 1)
         self.screen.blit(surf, bias)
 
@@ -156,7 +155,7 @@ class Renderer:
         for p in self.panels:
             p.blit_to(self.screen)
         self.draw_stones(game)
-        self.draw_banner(game.player, game.result)
+        self.draw_banner(game.player, game.winner, game.is_end)
         pygame.display.flip()
 
     @staticmethod

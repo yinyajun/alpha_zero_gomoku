@@ -22,7 +22,8 @@ class TreeNode:
         self.Q = 0.0  # Q(s,a) 平均价值
 
         # 估计量
-        self.P: Optional[float] = prior
+        self.P: Optional[float] = prior  # P(s,a) 下一手动作先验概率（策略网络)
+        self.value: Optional[float] = None  # V(s) 当前棋面的价值(来自价值网络的输出)
 
     def is_terminal(self):
         return self.game.is_end is True
@@ -86,18 +87,19 @@ class TreeNode:
 
         # 2) rollout
         priors, value = node.evaluate(pv_fn)
+        node.value = value
 
         # 3) expand all
         if not node.is_terminal():
             node.expand_all(priors)
 
         # 4) backprop
-        node.backprop(value)
+        node.backprop(node.value)
 
 
 class MCTSTree:
     def __init__(self, game: Game, pv_fn):
-        self.root = TreeNode(game=game, prior=0.0)
+        self.root = TreeNode(game=game.clone(), prior=0.0)
         self.pv_fn = pv_fn
 
     def add_noise(self, noise_eps: float, dirichlet_alpha: float):
@@ -115,7 +117,12 @@ class MCTSTree:
         if legal_idx.size == 0:  # 无合法位
             return
 
-        priors, _ = node.evaluate(pv_fn)  # 除非终局，不会全0
+        priors, value = node.evaluate(pv_fn)  # 除非终局，不会全0
+        # 由于prior存储在子节点中，根节点需要先展开才能添加噪声
+        node.value = value
+        if not node.is_expanded():
+            node.expand_all(priors)
+
         noise_legal = np.random.dirichlet([dirichlet_alpha] * legal_idx.size).astype(np.float32)  # sum=1 on legal
         noise_full = np.zeros_like(priors, dtype=np.float32)
         noise_full[legal_idx] = noise_legal
@@ -139,6 +146,7 @@ class MCTSTree:
             noise_eps: float,
             dirichlet_alpha: float,
     ) -> Move:
+        assert iterations > 0
 
         if self.root.game.move_count < noise_moves:
             self.add_noise(noise_eps, dirichlet_alpha)

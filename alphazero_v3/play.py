@@ -1,16 +1,19 @@
+import time
+from typing import Optional
+
 import torch
 import random
 from tqdm import tqdm
 
-from mcts import MCTSTree
-from game import Game, Player1, Player2, Win, Move
+from mcts1 import MCTSTree
+from game import Game, Player1, Player2, Move
 
 
 class BasePlayer:
     def __init__(self):
         self.game: Game = Game()
 
-    def prepare(self, game: Game) -> "BasePlayer":
+    def load(self, game: Game) -> "BasePlayer":
         self.game = game
         return self
 
@@ -28,7 +31,7 @@ class MCTSPlayer(BasePlayer):
 
     def __init__(
             self,
-            policy_value_fn,
+            pv_fn,
             iterations: int,
             c_puct: float,
             warm_moves: int,
@@ -38,8 +41,8 @@ class MCTSPlayer(BasePlayer):
             dirichlet_alpha: float,
     ):
         super(MCTSPlayer, self).__init__()
-        self.tree = None
-        self.policy_value_fn = policy_value_fn
+        self.tree: Optional[MCTSTree] = None
+        self.pv_fn = pv_fn
         self.iterations = iterations
         self.c_puct = c_puct
         self.warm_moves = warm_moves
@@ -48,9 +51,9 @@ class MCTSPlayer(BasePlayer):
         self.noise_eps = noise_eps
         self.dirichlet_alpha = dirichlet_alpha
 
-    def prepare(self, game: Game) -> "MCTSPlayer":
-        super(MCTSPlayer, self).prepare(game)
-        self.tree: MCTSTree = MCTSTree(game, self.policy_value_fn)
+    def load(self, game: Game) -> "MCTSPlayer":
+        super(MCTSPlayer, self).load(game)
+        self.tree: MCTSTree = MCTSTree(game, self.pv_fn)
         return self
 
     def search_move(self):
@@ -80,6 +83,7 @@ class RandomPlayer(BasePlayer):
     """随机合法落子，测试用。"""
 
     def search(self) -> Move:
+        time.sleep(0.5)
         moves = self.game.available_moves()
         move = random.choice(moves)
         return move
@@ -104,17 +108,18 @@ class HumanPlayer(BasePlayer):
                 return move
 
 
-def self_play(game: Game, player: MCTSPlayer, force_center: bool = False):
+def self_play(game: Game, player: MCTSPlayer, force_center: bool = False, enable_tqdm: bool = True):
     """
-    自我对弈
+    自我对弈（收集轨迹）
     """
     game = game.clone()
     step = 0
-    player = player.prepare(game)
+    player = player.load(game)
     trajectory = dict(s=[], pi=[], z=[], turns=[])  # z: [], float （这里装的是 z ∈ {-1,0,1}）
-    pbar = tqdm(desc="self-play", unit="step", bar_format="{desc}: [{elapsed_s:.2f}s,{rate_fmt}{postfix}]")
+    pbar = tqdm(desc="self-play", unit="step", disable=not enable_tqdm,
+                bar_format="{desc}: [{elapsed_s:.2f}s,{rate_fmt}{postfix}]")
 
-    while not game.result:
+    while not game.is_end:
         step += 1
 
         if step == 1 and force_center:  # empty board
@@ -126,20 +131,19 @@ def self_play(game: Game, player: MCTSPlayer, force_center: bool = False):
             trajectory["s"].append(game.get_state())  # [2, H, W], float
             trajectory["pi"].append(player.tree.search_prob)  # [H, W], float (动作访问分布)
             trajectory["turns"].append(game.player)
-
         game.step(move)
+
         player.observe(game)
 
         pbar.update(1)
         pbar.set_postfix({"step": step, "player": 3 - game.player})
 
     pbar.close()
+    winner = game.winner
 
-    if game.result == Win:
-        winner = 3 - game.player
+    if winner > 0:
         z = [torch.tensor(1.0 if p == winner else -1.0, dtype=torch.float) for p in trajectory["turns"]]
     else:  # draw
-        winner = 0
         z = [torch.tensor(0.0) for _ in trajectory["turns"]]
     trajectory["z"] = z
     # print(game)
@@ -154,11 +158,11 @@ def eval_play(game: Game, player1: MCTSPlayer, player2: MCTSPlayer):
     game = game.clone()
     step = 0
     players = {
-        Player1: player1.prepare(game),
-        Player2: player2.prepare(game)
+        Player1: player1.load(game),
+        Player2: player2.load(game)
     }
 
-    while not game.result:
+    while not game.is_end:
         step += 1
         player, opponent = players[game.player], players[3 - game.player]
 
@@ -167,27 +171,22 @@ def eval_play(game: Game, player1: MCTSPlayer, player2: MCTSPlayer):
         player.observe(game)
         opponent.observe(game)
 
-    if game.result == Win:
-        winner = 3 - game.player
-    else:  # draw
-        winner = 0
-
-    return step, winner
+    return step, game.winner
 
 
-def play(game: Game, player1: BasePlayer, player2: BasePlayer, render: "Renderer"):
+def play_and_render(game: Game, player1: BasePlayer, player2: BasePlayer, render: "Renderer"):
     """
-    人机对弈
+    可视化对弈
     """
     game = game.clone()
     step = 0
     players = {
-        Player1: player1.prepare(game),
-        Player2: player2.prepare(game)
+        Player1: player1.load(game),
+        Player2: player2.load(game)
     }
     render.draw_game(game)
 
-    while not game.result:
+    while not game.is_end:
         step += 1
 
         player, opponent = players[game.player], players[3 - game.player]
@@ -204,19 +203,39 @@ def play(game: Game, player1: BasePlayer, player2: BasePlayer, render: "Renderer
     render.wait_click()
 
 
-if __name__ == '__main__':
+def example_human_vs_human():
+    from render import Renderer
+    g = Game()
+    r = Renderer()
+    p1 = HumanPlayer(r)
+    p2 = HumanPlayer(r)
+    while True:
+        play_and_render(g, p1, p2, r)
+
+
+def example_human_vs_random():
+    from render import Renderer
+    g = Game()
+    r = Renderer()
+    p1 = HumanPlayer(r)
+    p2 = RandomPlayer()
+    while True:
+        play_and_render(g, p1, p2, r)
+
+
+def example_human_vs_ai():
     from model import Alpha0Module
     from render import Renderer
-    from evaluator import BatchEvaluator, build_pv_fn
+    from evaluator import build_pv_fn, build_pv_fn_batch
 
     g = Game()
     r = Renderer()
     model = Alpha0Module(resume_path="model.pt")
-    evaluator = BatchEvaluator(model, device=model.device)
+    pv_fn = build_pv_fn(model)
 
     p1 = HumanPlayer(r)
     p2 = MCTSPlayer(
-        policy_value_fn=build_pv_fn(evaluator),
+        pv_fn=pv_fn,
         iterations=600,
         c_puct=0.5,
         warm_moves=6,
@@ -227,4 +246,9 @@ if __name__ == '__main__':
     )
 
     while True:
-        play(g, p1, p2, r)
+        play_and_render(g, p1, p2, r)
+
+
+if __name__ == '__main__':
+    example_human_vs_human()
+    # example_human_vs_ai()

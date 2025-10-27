@@ -131,7 +131,7 @@ class TreeNode:
 
 class MCTSTree:
     def __init__(self, game: Game, pv_fn):
-        self.root = TreeNode(game=game)
+        self.root = TreeNode(game=game.clone())
         self.pv_fn = pv_fn
 
     def add_noise(self, noise_eps: float, dirichlet_alpha: float):
@@ -206,19 +206,16 @@ class MCTSTree:
         """
         assert new_game.move_count - self.root.game.move_count == 1
 
-        new_game = new_game.clone()
-        last_move = new_game.last_move
-
         # 尝试在现有孩子里找到这步棋
         for ch in self.root.children.values():
-            if ch.game.last_move == last_move:
+            if ch.game.last_move == new_game.last_move:
                 ch.parent = None
                 self.root.children = {}
                 self.root = ch
                 return
 
         # 没找到: 新建根
-        self.root = TreeNode(new_game)
+        self.root = TreeNode(new_game.clone())
 
     @property
     def search_prob(self):
