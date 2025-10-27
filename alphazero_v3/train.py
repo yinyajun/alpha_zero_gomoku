@@ -156,8 +156,8 @@ def train(conf: TrainConfig):
         print(f"[Collect] consume: {time.time() - start: .2f}sec, rounds: {len(rounds)}")
 
         # === B) 训练阶段 ===
-        model_path = f"output/model_{i}.pt"
-        buffer_path = f"output/buffer_{i}.pt"
+        model_path = "model.pt"
+        buffer_path = "buffer.pt"
         model.train_model(
             buffer,
             epochs=conf.train_epochs,
@@ -172,9 +172,6 @@ def train(conf: TrainConfig):
         torch.cuda.empty_cache()
 
     wandb.finish()
-
-
-
 
 
 if __name__ == '__main__':
