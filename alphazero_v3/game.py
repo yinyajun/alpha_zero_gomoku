@@ -51,7 +51,8 @@ class Game:
             是否结束
             winner是谁
         """
-        assert not self.is_end
+        if self.is_end:
+            return self.is_end, self.winner
 
         if move is not None:
             i, j = move
