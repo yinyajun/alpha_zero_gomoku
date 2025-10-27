@@ -1,12 +1,11 @@
 import time
-from typing import Optional
-
 import torch
 import random
 from tqdm import tqdm
+from typing import Optional
 
-from mcts1 import MCTSTree
 from game import Game, Player1, Player2, Move
+from mcts1 import MCTSTree
 
 
 class BasePlayer:
@@ -39,9 +38,10 @@ class MCTSPlayer(BasePlayer):
             noise_moves: int,
             noise_eps: float,
             dirichlet_alpha: float,
+            tree_cls=MCTSTree
     ):
         super(MCTSPlayer, self).__init__()
-        self.tree: Optional[MCTSTree] = None
+        self.tree: Optional["MCTSTree"] = None
         self.pv_fn = pv_fn
         self.iterations = iterations
         self.c_puct = c_puct
@@ -50,10 +50,11 @@ class MCTSPlayer(BasePlayer):
         self.noise_moves = noise_moves
         self.noise_eps = noise_eps
         self.dirichlet_alpha = dirichlet_alpha
+        self.tree_cls = tree_cls
 
     def load(self, game: Game) -> "MCTSPlayer":
         super(MCTSPlayer, self).load(game)
-        self.tree: MCTSTree = MCTSTree(game, self.pv_fn)
+        self.tree: "MCTSTree" = self.tree_cls(game, self.pv_fn)
         return self
 
     def search_move(self):

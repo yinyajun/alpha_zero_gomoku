@@ -1,3 +1,5 @@
+import time
+
 import wandb
 import torch
 import torch.nn as nn
@@ -102,7 +104,6 @@ class Alpha0Module(torch.nn.Module):
             log_interval: int = 100,
             value_coef: float = 0.4,
             entropy_coef: float = 0.0,
-            use_wandb: bool = False,
     ):
 
         if len(buffer) == 0:
@@ -111,6 +112,7 @@ class Alpha0Module(torch.nn.Module):
 
         self.train()
 
+        start = time.time()
         for epoch in range(1, epochs + 1):
             states, target_policies, target_values = buffer.sample(batch_size, self.device)
 
@@ -150,9 +152,8 @@ class Alpha0Module(torch.nn.Module):
                     "train/grad_norm": round(float(grad_norm.item()), 4),
                     "train/step": self.global_step,
                 }
-                if use_wandb:
-                    wandb.log(log_dict)
-                print(f"[train-{self.global_step}] {log_dict}")
+                wandb.log(log_dict)
+                print(f"[Train-{self.global_step}] {log_dict} consume: {time.time() - start: .2f} sec")
 
         self.eval()
 

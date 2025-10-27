@@ -5,6 +5,8 @@ from typing import Optional
 
 from game import Game, Move, Nobody
 
+print(f"[MCTS TREE CLS] {__name__}")
+
 
 class TreeNode:
     """
@@ -204,7 +206,7 @@ class MCTSTree:
         """
         在对局进行中复用搜索树
         """
-        assert new_game.move_count - self.root.game.move_count == 1
+        assert new_game.move_count - self.root.game.move_count == 1  # 只有多走一手的game才能复用
 
         # 尝试在现有孩子里找到这步棋
         for ch in self.root.children.values():

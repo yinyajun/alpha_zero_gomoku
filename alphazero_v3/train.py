@@ -1,8 +1,9 @@
 import time
+from datetime import datetime
+
 import wandb
 import torch
 from tqdm import tqdm
-from datetime import datetime
 from dataclasses import dataclass, asdict
 from concurrent.futures import ThreadPoolExecutor
 
@@ -39,24 +40,28 @@ class TrainConfig:
     # train
     center_round: int = 200
     total_round: int = 50000
-    collect_round: int = 2
+    collect_round: int = 10
     collect_actors: int = 10
 
 
-def parallel_train(conf: TrainConfig, ):
+def parallel_train(conf: TrainConfig):
     """两阶段同步训练"""
+    print("同步并行训练")
     model = Alpha0Module(lr=conf.lr, weight_decay=conf.weight_decay, resume_path=conf.resume_model_path)
     buffer = ReplayBuffer(capacity=50_000, resume_path=conf.resume_buffer_path)
     pv_fn = build_pv_fn_batch(model, max_batch_size=5, max_timeout_ms=0.015)
 
-    # wandb.init(project=f"alpha_zero_gomoku",
-    #            name=f"run-{datetime.now().strftime('%Y%m%d-%H%M')}",
-    #            config=asdict(conf))
-    # wandb.define_metric("selfplay/episode")
-    # wandb.define_metric("selfplay/*", step_metric="selfplay/episode")
-    # wandb.define_metric("selfplay/agg/*", step_metric="selfplay/episode")
-    # wandb.define_metric("train/step")
-    # wandb.define_metric("train/*", step_metric="train/step")
+    wandb.init(
+        project=f"alpha_zero_gomoku",
+        name=f"run-{datetime.now().strftime('%Y%m%d-%H%M')}",
+        config=asdict(conf),
+        mode="disabled"
+    )
+    wandb.define_metric("selfplay/episode")
+    wandb.define_metric("selfplay/*", step_metric="selfplay/episode")
+    wandb.define_metric("selfplay/agg/*", step_metric="selfplay/episode")
+    wandb.define_metric("train/step")
+    wandb.define_metric("train/*", step_metric="train/step")
 
     for i in range(1, 1 + conf.total_round, conf.collect_round):
         start = time.time()
@@ -72,8 +77,10 @@ def parallel_train(conf: TrainConfig, ):
                 noise_moves=conf.noise_moves,
                 noise_eps=conf.noise_eps,
                 dirichlet_alpha=conf.dirichlet_alpha,
+                tree_cls=MCTSTree,
             )
-            step, winner, trajectory = self_play(Game(), player, force_center=round < conf.center_round)
+            step, winner, trajectory = self_play(
+                Game(), player, force_center=round < conf.center_round, enable_tqdm=False)
             return step, winner, trajectory
 
         rounds = range(i, i + conf.collect_round)
@@ -102,73 +109,27 @@ def parallel_train(conf: TrainConfig, ):
 
         torch.cuda.empty_cache()
 
-    # wandb.finish()
-
-
-# def train3333(conf: TrainConfig):
-#     """两阶段同步训练"""
-#     model = Alpha0Module(lr=conf.lr, weight_decay=conf.weight_decay, resume_path=conf.resume_model_path)
-#     buffer = ReplayBuffer(capacity=50_000, resume_path=conf.resume_buffer_path)
-#     evaluator = BatchEvaluator(model, max_batch_size=conf.eval_batch, max_timeout_ms=conf.eval_timeout_ms)
-#     # wandb.init(project=f"alpha_zero_gomoku",
-#     #            name=f"run-{datetime.now().strftime('%Y%m%d-%H%M')}",
-#     #            config=asdict(conf))
-#     # wandb.define_metric("selfplay/episode")
-#     # wandb.define_metric("selfplay/*", step_metric="selfplay/episode")
-#     # wandb.define_metric("selfplay/agg/*", step_metric="selfplay/episode")
-#     # wandb.define_metric("train/step")
-#     # wandb.define_metric("train/*", step_metric="train/step")
-#     player = MCTSPlayer(
-#         pv_fn=build_pv_fn2(evaluator),
-#         iterations=conf.iterations,
-#         c_puct=conf.c_puct,
-#         warm_moves=conf.warm_moves,
-#         tau=conf.tau,
-#         noise_moves=conf.noise_moves,
-#         noise_eps=conf.noise_eps,
-#         dirichlet_alpha=conf.dirichlet_alpha,
-#     )
-#
-#     for i in range(1, 1 + conf.total_round, conf.collect_round):
-#
-#         # === A) 收集阶段：自我对弈 ===
-#         rounds = range(i, i + conf.collect_round)
-#         for r in rounds:
-#             step, winner, trajectory = self_play(Game(), player, force_center=r < conf.center_round)
-#             buffer.add_trajectory(trajectory)
-#
-#         # === B) 训练阶段 ===
-#         model_path = "model.pt"
-#         buffer_path = "buffer.pt"
-#         model.train_model(
-#             buffer,
-#             epochs=conf.train_epochs,
-#             batch_size=conf.batch_size,
-#             log_interval=conf.log_interval,
-#             value_coef=conf.value_coef,
-#             entropy_coef=conf.entropy_coef,
-#         )
-#         model.save_checkpoint(model_path)
-#         buffer.save(buffer_path)
-#
-#         torch.cuda.empty_cache()
-#
-#     # wandb.finish()
+    wandb.finish()
 
 
 def train(conf: TrainConfig):
     """两阶段同步训练"""
+    print("同步串行训练")
     model = Alpha0Module(lr=conf.lr, weight_decay=conf.weight_decay, resume_path=conf.resume_model_path)
     buffer = ReplayBuffer(capacity=50_000, resume_path=conf.resume_buffer_path)
     pv_fn = build_pv_fn(model)
-    # wandb.init(project=f"alpha_zero_gomoku",
-    #            name=f"run-{datetime.now().strftime('%Y%m%d-%H%M')}",
-    #            config=asdict(conf))
-    # wandb.define_metric("selfplay/episode")
-    # wandb.define_metric("selfplay/*", step_metric="selfplay/episode")
-    # wandb.define_metric("selfplay/agg/*", step_metric="selfplay/episode")
-    # wandb.define_metric("train/step")
-    # wandb.define_metric("train/*", step_metric="train/step")
+    wandb.init(
+        project=f"alpha_zero_gomoku",
+        name=f"run-{datetime.now().strftime('%Y%m%d-%H%M')}",
+        config=asdict(conf),
+        mode="disabled"
+
+    )
+    wandb.define_metric("selfplay/episode")
+    wandb.define_metric("selfplay/*", step_metric="selfplay/episode")
+    wandb.define_metric("selfplay/agg/*", step_metric="selfplay/episode")
+    wandb.define_metric("train/step")
+    wandb.define_metric("train/*", step_metric="train/step")
 
     player = MCTSPlayer(
         pv_fn=pv_fn,
@@ -179,6 +140,7 @@ def train(conf: TrainConfig):
         noise_moves=conf.noise_moves,
         noise_eps=conf.noise_eps,
         dirichlet_alpha=conf.dirichlet_alpha,
+        tree_cls=MCTSTree,
     )
 
     for i in range(1, 1 + conf.total_round, conf.collect_round):
@@ -209,7 +171,15 @@ def train(conf: TrainConfig):
 
         torch.cuda.empty_cache()
 
+    wandb.finish()
+
 
 if __name__ == '__main__':
-    train(conf=TrainConfig())
+    # mcts tree两种实现方式，通过import来切换
+    # from mcts2 import MCTSTree
+    from mcts1 import MCTSTree
+
+    conf = TrainConfig()
+    print(conf)
+    train(conf=conf)
     # train_with_batch(conf=TrainConfig())
