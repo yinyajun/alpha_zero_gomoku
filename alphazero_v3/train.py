@@ -20,9 +20,9 @@ class TrainConfig:
     board_size: int = Game.size
     win_num: int = Game.win_num
     # mcts
-    iterations: int = 600
+    iterations: int = 300
     c_puct: float = 0.5
-    noise_moves: int = 1
+    noise_moves: int = 5
     noise_eps: float = 0.25
     dirichlet_alpha: float = 0.20  # # 10/board_size
     warm_moves: int = 6
@@ -40,7 +40,7 @@ class TrainConfig:
     # train
     center_round: int = 200
     total_round: int = 50000
-    collect_round: int = 5
+    collect_round: int = 10
     collect_actors: int = 10
 
 
@@ -49,7 +49,7 @@ def parallel_train(conf: TrainConfig):
     print("同步并行训练")
     model = Alpha0Module(lr=conf.lr, weight_decay=conf.weight_decay, resume_path=conf.resume_model_path)
     buffer = ReplayBuffer(capacity=50_000, resume_path=conf.resume_buffer_path)
-    pv_fn = build_pv_fn_batch(model, max_batch_size=5, max_timeout_ms=0.015)
+    pv_fn = build_pv_fn_batch(model, max_batch_size=10, max_timeout_ms=0.015)
 
     wandb.init(
         project=f"alpha_zero_gomoku",
@@ -174,6 +174,9 @@ def train(conf: TrainConfig):
     wandb.finish()
 
 
+
+
+
 if __name__ == '__main__':
     # mcts tree两种实现方式，通过import来切换
     # from mcts2 import MCTSTree
@@ -181,5 +184,5 @@ if __name__ == '__main__':
 
     conf = TrainConfig()
     print(conf)
-    train(conf=conf)
-    # train_with_batch(conf=TrainConfig())
+    # train(conf=conf)
+    parallel_train(conf=TrainConfig())
