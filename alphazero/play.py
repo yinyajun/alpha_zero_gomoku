@@ -231,13 +231,13 @@ def example_human_vs_ai():
 
     g = Game()
     r = Renderer()
-    model = Alpha0Module(resume_path="model.pt")
+    model = Alpha0Module(resume_path="output/model.pt")
     pv_fn = build_pv_fn(model)
 
     p1 = HumanPlayer(r)
     p2 = MCTSPlayer(
         pv_fn=pv_fn,
-        iterations=490,
+        iterations=500,
         c_puct=0.5,
         warm_moves=0,
         tau=1.0,

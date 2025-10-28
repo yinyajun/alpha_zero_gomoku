@@ -1,3 +1,4 @@
+import os
 import time
 from datetime import datetime
 
@@ -11,7 +12,7 @@ from game import Game, Player1, Player2
 from model import Alpha0Module
 from evaluator import BatchEvaluator, build_pv_fn, build_pv_fn_batch
 from buffer import ReplayBuffer
-from play import self_play, MCTSPlayer
+from play import self_play, MCTSPlayer, eval_play
 
 
 @dataclass
@@ -59,6 +60,7 @@ class TrainConfig:
     warm_moves: int = 8
     tau: float = 1.0
     # model_train
+    save_dir: str = "output"
     resume_model_path: str = None
     resume_buffer_path: str = None
     train_epochs: int = 2000
@@ -68,20 +70,86 @@ class TrainConfig:
     batch_size: int = 256
     value_coef: float = 1.0
     # train
-    center_round: int = 800
-    total_round: int = 50000
-    collect_round: int = 10
-    collect_actors: int = 10 # 并行数目
+    center_round: int = 800  # 首子居中局数
+    total_round: int = 50000  # 总训练局数
+    collect_round: int = 10  # 收集局数
+    collect_actors: int = 10  # 收集并发
     # eval
-    eval_round: int = 20
-    eval_games: int = 40
+    eval_round: int = 40  # eval局数
+    eval_interval: int = 20  # eval间隔
 
 
+def eval(round: int, conf: TrainConfig):
+    m1_path = os.path.join(conf.save_dir, f"model_{round}.pt")
+    new_model = MCTSPlayer(
+        pv_fn=build_pv_fn(Alpha0Module(resume_path=m1_path)),
+        iterations=conf.iterations,
+        c_puct=conf.c_puct,
+        warm_moves=0,
+        tau=conf.tau,
+        noise_moves=0,
+        noise_eps=conf.noise_eps,
+        dirichlet_alpha=conf.dirichlet_alpha,
+        tree_cls=MCTSTree,
+    )
+
+    m2_path = os.path.join(conf.save_dir, f"model_{round - 1}.pt")
+    ref_model = MCTSPlayer(
+        pv_fn=build_pv_fn(Alpha0Module(resume_path=m2_path)),
+        iterations=conf.iterations,
+        c_puct=conf.c_puct,
+        warm_moves=0,
+        tau=conf.tau,
+        noise_moves=0,
+        noise_eps=conf.noise_eps,
+        dirichlet_alpha=conf.dirichlet_alpha,
+        tree_cls=MCTSTree,
+    )
+
+    new_win = 0
+    ref_win = 0
+
+    for i in range(conf.eval_round):
+        if i % 2 == 0:
+            _, winner = eval_play(Game(), player1=new_model, player2=ref_model)
+            new_win += int(winner == Player1)
+            ref_win += int(winner == Player2)
+        else:
+            _, winner = eval_play(Game(), player1=ref_model, player2=new_model)
+            new_win += int(winner == Player2)
+            ref_win += int(winner == Player1)
+
+    print(f"[eval] new_win: {new_win}, ref_win: {ref_win}")
+
+    # === Remove old files ===
+    try:
+        # 保留最近两个版本，删除更早的
+        keep_n = 5
+        model_files = sorted(
+            [f for f in os.listdir(conf.save_dir) if f.startswith("model_") and f.endswith(".pt")],
+            key=lambda x: int(x.split("_")[1].split(".")[0])
+        )
+        buffer_files = sorted(
+            [f for f in os.listdir(conf.save_dir) if f.startswith("buffer_") and f.endswith(".pt")],
+            key=lambda x: int(x.split("_")[1].split(".")[0])
+        )
+
+        # 删除旧的模型和 buffer 文件
+        for old_file in model_files[:-keep_n]:
+            os.remove(os.path.join(conf.save_dir, old_file))
+            print(f"[cleanup] removed old model file: {old_file}")
+        for old_file in buffer_files[:-keep_n]:
+            os.remove(os.path.join(conf.save_dir, old_file))
+            print(f"[cleanup] removed old buffer file: {old_file}")
+
+    except Exception as e:
+        print(f"[cleanup] failed to remove old files: {e}")
 
 
 def parallel_train(conf: TrainConfig):
     """两阶段同步训练"""
     print("同步并行训练")
+    os.makedirs(conf.save_dir, exist_ok=True)
     model = Alpha0Module(lr=conf.lr, weight_decay=conf.weight_decay, resume_path=conf.resume_model_path)
     buffer = ReplayBuffer(capacity=50_000, resume_path=conf.resume_buffer_path)
     pv_fn = build_pv_fn_batch(model, max_batch_size=conf.collect_actors, max_timeout_ms=0.04)
@@ -136,8 +204,8 @@ def parallel_train(conf: TrainConfig):
         print(f"[Collect] consume: {time.time() - start: .2f}sec, rounds: {len(rounds)}")
 
         # === B) 训练阶段 ===
-        model_path = "model.pt"
-        buffer_path = "buffer.pt"
+        model_path = os.path.join(conf.save_dir, f"model_{i}.pt")
+        buffer_path = os.path.join(conf.save_dir, f"buffer_{i}.pt")
         model.train_model(
             buffer,
             epochs=conf.train_epochs,
@@ -147,8 +215,11 @@ def parallel_train(conf: TrainConfig):
         )
         model.save_checkpoint(model_path)
         buffer.save(buffer_path)
-
         torch.cuda.empty_cache()
+
+        # === C) Eval ===
+        if i % conf.eval_round == 0:
+            eval(i, conf)
 
     wandb.finish()
 
@@ -156,6 +227,7 @@ def parallel_train(conf: TrainConfig):
 def train(conf: TrainConfig):
     """两阶段同步训练"""
     print("同步串行训练")
+    os.makedirs(conf.save_dir, exist_ok=True)
     model = Alpha0Module(lr=conf.lr, weight_decay=conf.weight_decay, resume_path=conf.resume_model_path)
     buffer = ReplayBuffer(capacity=50_000, resume_path=conf.resume_buffer_path)
     pv_fn = build_pv_fn(model)
@@ -201,8 +273,8 @@ def train(conf: TrainConfig):
         print(f"[Collect] consume: {time.time() - start: .2f}sec, rounds: {len(rounds)}")
 
         # === B) 训练阶段 ===
-        model_path = "model.pt"
-        buffer_path = "buffer.pt"
+        model_path = os.path.join(conf.save_dir, f"model_{i}.pt")
+        buffer_path = os.path.join(conf.save_dir, f"buffer_{i}.pt")
         model.train_model(
             buffer,
             epochs=conf.train_epochs,
@@ -214,6 +286,10 @@ def train(conf: TrainConfig):
         buffer.save(buffer_path)
 
         torch.cuda.empty_cache()
+
+        # === C) Eval ===
+        if i % conf.eval_round == 0:
+            eval(i, conf)
 
     wandb.finish()
 
