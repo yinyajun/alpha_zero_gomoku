@@ -57,7 +57,7 @@ class TrainConfig:
     noise_moves: int = 6
     noise_eps: float = 0.25
     dirichlet_alpha: float = 0.123  # # 10/board_size
-    warm_moves: int = 8
+    warm_moves: int = 10
     tau: float = 1.0
     # model_train
     save_dir: str = "output"

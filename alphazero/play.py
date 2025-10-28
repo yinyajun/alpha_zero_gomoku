@@ -101,7 +101,6 @@ class HumanPlayer(BasePlayer):
         self.edge = edge
 
     def search(self) -> Move:
-        time.sleep(0.5)
         while True:
             pos = self.render.wait_click()
             pos = (pos[0] - self.edge, pos[1] - self.edge)
