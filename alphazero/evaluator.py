@@ -95,6 +95,7 @@ class BatchEvaluator:
                 except queue.Empty:
                     break
 
+            print(1111, len(batch))
             xs = [x for (x, _, _) in batch]
             ms = [m for (_, m, _) in batch]
             states = torch.stack(xs, 0).contiguous()  # [B,2,h,w]
