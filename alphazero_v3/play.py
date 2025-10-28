@@ -101,6 +101,7 @@ class HumanPlayer(BasePlayer):
         self.edge = edge
 
     def search(self) -> Move:
+        time.sleep(0.5)
         while True:
             pos = self.render.wait_click()
             pos = (pos[0] - self.edge, pos[1] - self.edge)
@@ -191,14 +192,13 @@ def play_and_render(game: Game, player1: BasePlayer, player2: BasePlayer, render
         step += 1
 
         player, opponent = players[game.player], players[3 - game.player]
-        render.draw_mcts_numbers(player.tree if isinstance(player, MCTSPlayer) else None)
-
         move = player.search()
         game.step(move)
 
+        render.draw_game(game, player.tree if isinstance(player, MCTSPlayer) else None)
+
         player.observe(game)
         opponent.observe(game)
-        render.draw_game(game)
 
     # end
     render.wait_click()

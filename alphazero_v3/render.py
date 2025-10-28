@@ -1,5 +1,8 @@
+from typing import Optional
+
 import pygame
 from game import Game, Player1
+from mcts1 import MCTSTree
 
 cell_size = 40
 edge = int(1.5 * cell_size)
@@ -52,7 +55,7 @@ class Renderer:
         pygame.init()
         self.size_n = size_n
         self.cell = cell
-        self.font = pygame.font.Font(None, 24)
+        self.font = pygame.font.Font(None, 22)
 
         # 画布大小
         self.BOARD_W = self.cell * self.size_n
@@ -105,7 +108,7 @@ class Renderer:
                     continue
                 color = black if v == 1 else white
                 cx, cy = self.centers[i][j]
-                pygame.draw.circle(self.screen, color, (bx + cx, by + cy), 14)
+                pygame.draw.circle(self.screen, color, (bx + cx, by + cy), 12)
 
     def draw_mcts_numbers(self, tree: "MCTSTree"):
         """把 MCTS 的数值画到三个面板：value/visits/prior；node 为 None 则跳过。"""
@@ -118,8 +121,8 @@ class Renderer:
         bx2, by2 = self.panels[2].pos
         bx3, by3 = self.panels[3].pos
 
-        for ch in tree.root.children.values():
-            i, j = ch.game.last_move
+        for move, ch in tree.root.children.items():
+            i, j = move
             ax, ay = self.num_anchor[i][j]
 
             # value_out 面板=1
@@ -149,13 +152,14 @@ class Renderer:
         surf = self.font.render(text, True, 1)
         self.screen.blit(surf, bias)
 
-    def draw_game(self, game: Game):
+    def draw_game(self, game: Game, tree: Optional["MCTSTree"] = None):
         """一次完整渲染：清屏 -> 四个面板底图 -> 棋子 -> 数值 -> flip。"""
         self.screen.fill(bg_color)
         for p in self.panels:
             p.blit_to(self.screen)
         self.draw_stones(game)
         self.draw_banner(game.player, game.winner, game.is_end)
+        self.draw_mcts_numbers(tree)
         pygame.display.flip()
 
     @staticmethod
