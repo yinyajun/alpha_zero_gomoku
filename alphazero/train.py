@@ -75,8 +75,8 @@ class TrainConfig:
     collect_round: int = 10  # 收集局数
     collect_actors: int = 10  # 收集并发
     # eval
-    eval_round: int = 40  # eval局数
-    eval_interval: int = 20  # eval间隔
+    eval_round: int = 20  # eval局数
+    eval_interval: int = 100  # eval间隔
 
 
 def eval(round: int, conf: TrainConfig):
