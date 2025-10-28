@@ -118,7 +118,7 @@ class Renderer:
         bx2, by2 = self.panels[2].pos
         bx3, by3 = self.panels[3].pos
 
-        for ch in tree.root.children:
+        for ch in tree.root.children.values():
             i, j = ch.game.last_move
             ax, ay = self.num_anchor[i][j]
 
@@ -131,7 +131,7 @@ class Renderer:
             self.screen.blit(self.font.render(vis_str, True, black), (bx2 + ax, by2 + ay))
 
             # policy_out 面板=3
-            p = priors[i * size + j] if priors else ch.P
+            p = priors[i * size + j] if priors is not None else ch.P
             p_str = f"{p: .2f}"
             self.screen.blit(self.font.render(p_str, True, black), (bx3 + ax, by3 + ay))
 
