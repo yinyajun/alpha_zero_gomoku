@@ -251,5 +251,5 @@ def example_human_vs_ai():
 
 
 if __name__ == '__main__':
-    example_human_vs_human()
-    # example_human_vs_ai()
+    # example_human_vs_human()
+    example_human_vs_ai()
