@@ -237,11 +237,11 @@ def example_human_vs_ai():
     p1 = HumanPlayer(r)
     p2 = MCTSPlayer(
         pv_fn=pv_fn,
-        iterations=600,
+        iterations=490,
         c_puct=0.5,
-        warm_moves=6,
+        warm_moves=0,
         tau=1.0,
-        noise_moves=10,
+        noise_moves=0,
         noise_eps=0.25,
         dirichlet_alpha=0.2,
     )
