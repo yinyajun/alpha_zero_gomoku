@@ -51,12 +51,12 @@ class TrainConfig:
     board_size: int = Game.size
     win_num: int = Game.win_num
     # mcts
-    iterations: int = 490
+    iterations: int = 500
     c_puct: float = 0.5
-    noise_moves: int = 7
+    noise_moves: int = 6
     noise_eps: float = 0.25
     dirichlet_alpha: float = 0.123  # # 10/board_size
-    warm_moves: int = 11
+    warm_moves: int = 8
     tau: float = 1.0
     # model_train
     resume_model_path: str = None
@@ -68,10 +68,15 @@ class TrainConfig:
     batch_size: int = 256
     value_coef: float = 1.0
     # train
-    center_round: int = 200
+    center_round: int = 800
     total_round: int = 50000
     collect_round: int = 10
-    collect_actors: int = 10
+    collect_actors: int = 10 # 并行数目
+    # eval
+    eval_round: int = 20
+    eval_games: int = 40
+
+
 
 
 def parallel_train(conf: TrainConfig):
@@ -79,7 +84,7 @@ def parallel_train(conf: TrainConfig):
     print("同步并行训练")
     model = Alpha0Module(lr=conf.lr, weight_decay=conf.weight_decay, resume_path=conf.resume_model_path)
     buffer = ReplayBuffer(capacity=50_000, resume_path=conf.resume_buffer_path)
-    pv_fn = build_pv_fn_batch(model, max_batch_size=10, max_timeout_ms=0.04)
+    pv_fn = build_pv_fn_batch(model, max_batch_size=conf.collect_actors, max_timeout_ms=0.04)
     metric = PlayMetric()
 
     wandb.init(
