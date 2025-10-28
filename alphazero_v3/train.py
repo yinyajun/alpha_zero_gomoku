@@ -66,8 +66,7 @@ class TrainConfig:
     lr: float = 1e-3
     weight_decay: float = 1e-4
     batch_size: int = 256
-    value_coef: float = 0.5
-    entropy_coef: float = 0.0
+    value_coef: float = 1.0
     # train
     center_round: int = 200
     total_round: int = 50000
@@ -140,7 +139,6 @@ def parallel_train(conf: TrainConfig):
             batch_size=conf.batch_size,
             log_interval=conf.log_interval,
             value_coef=conf.value_coef,
-            entropy_coef=conf.entropy_coef,
         )
         model.save_checkpoint(model_path)
         buffer.save(buffer_path)
@@ -206,7 +204,6 @@ def train(conf: TrainConfig):
             batch_size=conf.batch_size,
             log_interval=conf.log_interval,
             value_coef=conf.value_coef,
-            entropy_coef=conf.entropy_coef,
         )
         model.save_checkpoint(model_path)
         buffer.save(buffer_path)

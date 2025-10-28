@@ -103,7 +103,6 @@ class Alpha0Module(torch.nn.Module):
             batch_size: int = 128,
             log_interval: int = 100,
             value_coef: float = 0.4,
-            entropy_coef: float = 0.0,
     ):
 
         if len(buffer) == 0:
@@ -120,12 +119,11 @@ class Alpha0Module(torch.nn.Module):
             policy_logits, value_logit = self(states)
 
             # loss
-            # policy_loss = F.cross_entropy(policy_logits, target_policies) # 新版CE支持软标签分布
-            policy_loss = -(target_policies * F.log_softmax(policy_logits, dim=1)).sum(dim=1).mean()
+            log_policy_prob = F.log_softmax(policy_logits, dim=-1)  # todo: need mask?
+            policy_loss = -(target_policies * log_policy_prob).sum(dim=-1).mean()  # H(pi, p)
             value_loss = F.mse_loss(value_logit, target_values)
-            log_policy_prob = F.log_softmax(policy_logits, dim=-1)
             entropy = - (log_policy_prob * log_policy_prob.exp()).sum(dim=-1).mean()
-            loss = policy_loss + value_coef * value_loss - entropy_coef * entropy
+            loss = policy_loss + value_coef * value_loss
 
             # backward
             self.optimizer.zero_grad()
@@ -146,7 +144,7 @@ class Alpha0Module(torch.nn.Module):
                     "train/loss_total": round(loss.item(), 4),
                     "train/loss_policy": round(policy_loss.item(), 4),
                     "train/loss_value": round(value_loss.item(), 4),
-                    "train/entropy": round(entropy.item(), 4),
+                    "train/policy_entropy": round(entropy.item(), 4),
                     "train/target_entropy": round(target_entropy.item(), 4),
                     "train/value_mae": round(value_mae.item(), 4),
                     "train/grad_norm": round(float(grad_norm.item()), 4),
