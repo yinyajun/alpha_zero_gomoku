@@ -152,7 +152,7 @@ def parallel_train(conf: TrainConfig):
     os.makedirs(conf.save_dir, exist_ok=True)
     model = Alpha0Module(lr=conf.lr, weight_decay=conf.weight_decay, resume_path=conf.resume_model_path)
     buffer = ReplayBuffer(capacity=50_000, resume_path=conf.resume_buffer_path)
-    pv_fn = build_pv_fn_batch(model, max_batch_size=conf.collect_actors, max_timeout_ms=0.04)
+    pv_fn = build_pv_fn_batch(model, max_batch_size=conf.collect_actors, max_timeout_ms=0.01)
     metric = PlayMetric()
 
     wandb.init(
