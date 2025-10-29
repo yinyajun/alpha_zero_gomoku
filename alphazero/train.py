@@ -52,19 +52,19 @@ class TrainConfig:
     board_size: int = Game.size
     win_num: int = Game.win_num
     # mcts
-    iterations: int = 300
+    iterations: int = 490
     c_puct: float = 0.5
     noise_moves: int = 7
     noise_eps: float = 0.25
-    dirichlet_alpha: float = 0.2  # # 10/board_size
+    dirichlet_alpha: float = 0.13  # # 10/board_size
     warm_moves: int = 11
     tau: float = 1.0
     # model_train
     save_dir: str = "output"
     resume_model_path: str = None
     resume_buffer_path: str = None
-    train_epochs: int = 1000
-    log_interval: int = 500
+    train_epochs: int = 2000
+    log_interval: int = 250
     lr: float = 1e-3
     weight_decay: float = 1e-4
     batch_size: int = 256
@@ -163,7 +163,7 @@ def parallel_train(conf: TrainConfig):
         project=f"alpha_zero_gomoku",
         name=f"run-{datetime.now().strftime('%Y%m%d-%H%M')}",
         config=asdict(conf),
-        mode="disabled"
+        # mode="disabled"
     )
     wandb.define_metric("selfplay/episode")
     wandb.define_metric("selfplay/*", step_metric="selfplay/episode")
