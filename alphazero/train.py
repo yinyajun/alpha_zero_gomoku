@@ -10,7 +10,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 from game import Game, Player1, Player2
 from model import Alpha0Module
-from evaluator import BatchEvaluator, build_pv_fn, build_pv_fn_batch
+from evaluator import BatchQueuedEvaluator, build_pv_fn, build_pv_fn_batch
 from buffer import ReplayBuffer
 from play import self_play, MCTSPlayer, eval_play
 
@@ -73,13 +73,13 @@ class TrainConfig:
     center_round: int = 400  # 首子居中局数
     total_round: int = 100000  # 总训练局数
     collect_round: int = 10  # 收集局数
-    collect_actors: int = 10  # 收集并发
+    collect_actors: int = 32  # 收集并发
     # eval
     eval_round: int = 20  # eval局数
     eval_interval: int = 20  # eval间隔局数 = collect_round * eval_interval
 
 
-def eval(round: int, conf: TrainConfig):
+def evaluate(round: int, conf: TrainConfig):
     if round % (conf.eval_interval * conf.collect_round) != 0:
         return
 
@@ -156,7 +156,7 @@ def parallel_train(conf: TrainConfig):
     os.makedirs(conf.save_dir, exist_ok=True)
     model = Alpha0Module(lr=conf.lr, weight_decay=conf.weight_decay, resume_path=conf.resume_model_path)
     buffer = ReplayBuffer(capacity=50_000, resume_path=conf.resume_buffer_path)
-    pv_fn = build_pv_fn_batch(model, max_batch_size=conf.collect_actors, max_timeout_ms=0.04)
+    pv_fn = build_pv_fn_batch(model, max_batch_size=128, max_timeout_ms=10)
     metric = PlayMetric()
 
     wandb.init(
@@ -220,7 +220,7 @@ def parallel_train(conf: TrainConfig):
         )
         model.save_checkpoint(model_path)
         buffer.save(buffer_path)
-        eval(max_round, conf)
+        evaluate(max_round, conf)
         torch.cuda.empty_cache()
 
     wandb.finish()
@@ -287,7 +287,7 @@ def train(conf: TrainConfig):
         )
         model.save_checkpoint(model_path)
         buffer.save(buffer_path)
-        eval(max_round, conf)
+        evaluate(max_round, conf)
         torch.cuda.empty_cache()
 
     wandb.finish()

@@ -13,21 +13,28 @@ class SingleEvaluator:
         self.model = model
 
     def predict(self, state, mask) -> tuple[np.ndarray, float]:
-        state = state.unsqueeze(0)  # [1,2,h,w]
+        if state.dim() == 3:
+            state = state.unsqueeze(0)  # [1,2,h,w]
+        if mask.dim() == 1:
+            mask = mask.unsqueeze(0)  # [1, hw]
+
+        batch_size = state.shape[0]
 
         with torch.no_grad():
             state = state.to(self.model.device)
             policy_out, value_out = self.model(state)  # logits: [1,A], values: [1,1]
 
-        policy_out = policy_out[0].detach().cpu()
+        policy_out = policy_out.detach().cpu()
         value_out = value_out.detach().cpu()
         policy_out = policy_out.masked_fill(mask, -1e9)
         policy_out = F.softmax(policy_out, dim=-1)
-        # logits: [1,A], values: [1,1]
-        return policy_out.numpy().astype(np.float32), float(value_out.item())
+
+        if batch_size == 1:
+            return policy_out[0].numpy().astype(np.float32), float(value_out.item())
+        return policy_out.numpy().astype(np.float32), value_out.numpy()
 
 
-class BatchEvaluator:
+class BatchQueuedEvaluator:
     """
     达到 batch_size 或超时 timeout_ms，才真正计算
     """
@@ -114,11 +121,9 @@ def build_pv_fn(model: Alpha0Module):
 
 
 def build_pv_fn_batch(model: Alpha0Module, max_batch_size: int = 1, max_timeout_ms: float = 0.1):
-    evaluator = BatchEvaluator(model, model.device, max_batch_size=max_batch_size, max_timeout_ms=max_timeout_ms)
+    evaluator = BatchQueuedEvaluator(model, model.device, max_batch_size=max_batch_size, max_timeout_ms=max_timeout_ms)
 
     def predict(state: torch.Tensor, mask: torch.Tensor):
         return evaluator.submit(state, mask).get()
 
     return predict
-
-
