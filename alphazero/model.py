@@ -73,7 +73,7 @@ class Alpha0Module(torch.nn.Module):
         self.eval()
 
     def forward(self, x):
-        # backbone
+        # stem
         x = self.relu(self.bn1(self.conv1(x)))  # [B, 64, H, W]
         x = self.res1(x)
         x = self.relu(self.bn2(self.conv2(x)))  # [B, 128, H, W]
@@ -118,11 +118,14 @@ class Alpha0Module(torch.nn.Module):
             # forward
             policy_logits, value_logit = self(states)
 
+            # mask
+            occupied = (states[:, 0] + states[:, 1]).flatten(1) > 0  # [B, A]
+            policy_logits = policy_logits.masked_fill(occupied, -1e9)
+
             # loss
-            log_policy_prob = F.log_softmax(policy_logits, dim=-1)  # todo: need mask?
+            log_policy_prob = F.log_softmax(policy_logits, dim=-1)
             policy_loss = -(target_policies * log_policy_prob).sum(dim=-1).mean()  # H(pi, p)
             value_loss = F.mse_loss(value_logit, target_values)
-            entropy = - (log_policy_prob * log_policy_prob.exp()).sum(dim=-1).mean()
             loss = policy_loss + value_coef * value_loss
 
             # backward
@@ -134,6 +137,8 @@ class Alpha0Module(torch.nn.Module):
             self.global_step += 1
 
             with torch.no_grad():
+                # policy entropy
+                entropy = - (log_policy_prob * log_policy_prob.exp()).sum(dim=-1).mean()
                 value_mae = (value_logit - target_values).abs().mean()
                 # target_policy entropy
                 safe_log = torch.where(target_policies > 0, target_policies.log(), torch.zeros_like(target_policies))
@@ -141,9 +146,9 @@ class Alpha0Module(torch.nn.Module):
 
             if epoch % log_interval == 0:
                 log_dict = {
-                    "train/loss_total": round(loss.item(), 4),
-                    "train/loss_policy": round(policy_loss.item(), 4),
-                    "train/loss_value": round(value_loss.item(), 4),
+                    "train/total_loss": round(loss.item(), 4),
+                    "train/policy_loss": round(policy_loss.item(), 4),
+                    "train/value_loss": round(value_loss.item(), 4),
                     "train/policy_entropy": round(entropy.item(), 4),
                     "train/target_entropy": round(target_entropy.item(), 4),
                     "train/value_mae": round(value_mae.item(), 4),
@@ -163,6 +168,7 @@ class Alpha0Module(torch.nn.Module):
             "global_step": int(self.global_step),
         }
         torch.save(ckpt, path)
+        print(f"[Save] checkpoint: {path}")
 
     def load_checkpoint(self, path: str):
         ckpt = torch.load(path, map_location="cpu")

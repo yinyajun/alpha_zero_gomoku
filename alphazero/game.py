@@ -11,8 +11,8 @@ Player2 = 2  # 玩家2落子
 
 
 class Game:
-    size = 9  # 棋盘边长
-    win_num = 5  # 连子数
+    size = 7  # 棋盘边长
+    win_num = 4  # 连子数
 
     def __init__(self, first_player: int = Player1):
         self.board = np.zeros((self.size, self.size), dtype=np.int8)  # 0=空, 1/2=玩家

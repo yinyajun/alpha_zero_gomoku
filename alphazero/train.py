@@ -52,37 +52,42 @@ class TrainConfig:
     board_size: int = Game.size
     win_num: int = Game.win_num
     # mcts
-    iterations: int = 500
+    iterations: int = 300
     c_puct: float = 0.5
-    noise_moves: int = 6
+    noise_moves: int = 7
     noise_eps: float = 0.25
-    dirichlet_alpha: float = 0.123  # # 10/board_size
-    warm_moves: int = 10
+    dirichlet_alpha: float = 0.2  # # 10/board_size
+    warm_moves: int = 11
     tau: float = 1.0
     # model_train
     save_dir: str = "output"
     resume_model_path: str = None
     resume_buffer_path: str = None
-    train_epochs: int = 1600
-    log_interval: int = 200
+    train_epochs: int = 1000
+    log_interval: int = 500
     lr: float = 1e-3
     weight_decay: float = 1e-4
     batch_size: int = 256
     value_coef: float = 1.0
     # train
-    center_round: int = 800  # 首子居中局数
-    total_round: int = 50000  # 总训练局数
+    center_round: int = 400  # 首子居中局数
+    total_round: int = 100000  # 总训练局数
     collect_round: int = 10  # 收集局数
     collect_actors: int = 10  # 收集并发
     # eval
     eval_round: int = 20  # eval局数
-    eval_interval: int = 100  # eval间隔
+    eval_interval: int = 20  # eval间隔局数 = collect_round * eval_interval
 
 
 def eval(round: int, conf: TrainConfig):
-    m1_path = os.path.join(conf.save_dir, f"model_{round}.pt")
+    if round % (conf.eval_interval * conf.collect_round) != 0:
+        return
+
+    new_model_path = os.path.join(conf.save_dir, f"model_{round}.pt")
+    ref_model_path = os.path.join(conf.save_dir, f"model_{round - conf.collect_round}.pt")
+
     new_model = MCTSPlayer(
-        pv_fn=build_pv_fn(Alpha0Module(resume_path=m1_path)),
+        pv_fn=build_pv_fn(Alpha0Module(resume_path=new_model_path)),
         iterations=conf.iterations,
         c_puct=conf.c_puct,
         warm_moves=0,
@@ -93,9 +98,8 @@ def eval(round: int, conf: TrainConfig):
         tree_cls=MCTSTree,
     )
 
-    m2_path = os.path.join(conf.save_dir, f"model_{round - 1}.pt")
     ref_model = MCTSPlayer(
-        pv_fn=build_pv_fn(Alpha0Module(resume_path=m2_path)),
+        pv_fn=build_pv_fn(Alpha0Module(resume_path=ref_model_path)),
         iterations=conf.iterations,
         c_puct=conf.c_puct,
         warm_moves=0,
@@ -109,7 +113,7 @@ def eval(round: int, conf: TrainConfig):
     new_win = 0
     ref_win = 0
 
-    for i in range(conf.eval_round):
+    for i in tqdm(range(conf.eval_round), desc="Eval", unit="round"):
         if i % 2 == 0:
             _, winner = eval_play(Game(), player1=new_model, player2=ref_model)
             new_win += int(winner == Player1)
@@ -119,12 +123,12 @@ def eval(round: int, conf: TrainConfig):
             new_win += int(winner == Player2)
             ref_win += int(winner == Player1)
 
-    print(f"[eval] new_win: {new_win}, ref_win: {ref_win}")
+    print(f"[Eval] new_win: {new_win}, ref_win: {ref_win}")
 
     # === Remove old files ===
     try:
-        # 保留最近两个版本，删除更早的
-        keep_n = 5
+        # 保留最近的版本，删除更早的
+        keep_n = 10
         model_files = sorted(
             [f for f in os.listdir(conf.save_dir) if f.startswith("model_") and f.endswith(".pt")],
             key=lambda x: int(x.split("_")[1].split(".")[0])
@@ -152,14 +156,14 @@ def parallel_train(conf: TrainConfig):
     os.makedirs(conf.save_dir, exist_ok=True)
     model = Alpha0Module(lr=conf.lr, weight_decay=conf.weight_decay, resume_path=conf.resume_model_path)
     buffer = ReplayBuffer(capacity=50_000, resume_path=conf.resume_buffer_path)
-    pv_fn = build_pv_fn_batch(model, max_batch_size=conf.collect_actors, max_timeout_ms=0.03)
+    pv_fn = build_pv_fn_batch(model, max_batch_size=conf.collect_actors, max_timeout_ms=0.04)
     metric = PlayMetric()
 
     wandb.init(
         project=f"alpha_zero_gomoku",
         name=f"run-{datetime.now().strftime('%Y%m%d-%H%M')}",
         config=asdict(conf),
-        # mode="disabled"
+        mode="disabled"
     )
     wandb.define_metric("selfplay/episode")
     wandb.define_metric("selfplay/*", step_metric="selfplay/episode")
@@ -167,7 +171,7 @@ def parallel_train(conf: TrainConfig):
     wandb.define_metric("train/step")
     wandb.define_metric("train/*", step_metric="train/step")
 
-    for i in range(1, 1 + conf.total_round, conf.collect_round):
+    for i in range(0, conf.total_round, conf.collect_round):
         start = time.time()
 
         # === A) 收集阶段：并发跑自我对弈 ===
@@ -184,10 +188,11 @@ def parallel_train(conf: TrainConfig):
                 tree_cls=MCTSTree,
             )
             step, winner, trajectory = self_play(
-                Game(), player, force_center=round < conf.center_round, enable_tqdm=False)
+                Game(), player, force_center=round <= conf.center_round, enable_tqdm=False)
             return step, winner, trajectory
 
-        rounds = range(i, i + conf.collect_round)
+        max_round = i + conf.collect_round
+        rounds = range(i, max_round)
 
         metrics = []
         with ThreadPoolExecutor(max_workers=conf.collect_actors) as executor:
@@ -198,14 +203,14 @@ def parallel_train(conf: TrainConfig):
                 metrics.append(metric.update(winner, step))
 
         for r in metrics:
-            print(r)
+            # print(r)
             wandb.log(r)
 
         print(f"[Collect] consume: {time.time() - start: .2f}sec, rounds: {len(rounds)}")
 
         # === B) 训练阶段 ===
-        model_path = os.path.join(conf.save_dir, f"model_{i}.pt")
-        buffer_path = os.path.join(conf.save_dir, f"buffer_{i}.pt")
+        model_path = os.path.join(conf.save_dir, f"model_{max_round}.pt")
+        buffer_path = os.path.join(conf.save_dir, f"buffer_{max_round}.pt")
         model.train_model(
             buffer,
             epochs=conf.train_epochs,
@@ -215,11 +220,8 @@ def parallel_train(conf: TrainConfig):
         )
         model.save_checkpoint(model_path)
         buffer.save(buffer_path)
+        eval(max_round, conf)
         torch.cuda.empty_cache()
-
-        # === C) Eval ===
-        if i % conf.eval_round == 0:
-            eval(i, conf)
 
     wandb.finish()
 
@@ -257,24 +259,25 @@ def train(conf: TrainConfig):
         tree_cls=MCTSTree,
     )
 
-    for i in range(1, 1 + conf.total_round, conf.collect_round):
+    for i in range(0, conf.total_round, conf.collect_round):
 
         start = time.time()
 
         # === A) 收集阶段：自我对弈 ===
-        rounds = range(i, i + conf.collect_round)
+        max_round = i + conf.collect_round
+        rounds = range(i, max_round)
         for r in rounds:
             step, winner, trajectory = self_play(Game(), player, force_center=r < conf.center_round)
             buffer.add_trajectory(trajectory)
             record = metric.update(winner, step)
-            print(record)
+            # print(record)
             wandb.log(record)
 
         print(f"[Collect] consume: {time.time() - start: .2f}sec, rounds: {len(rounds)}")
 
         # === B) 训练阶段 ===
-        model_path = os.path.join(conf.save_dir, f"model_{i}.pt")
-        buffer_path = os.path.join(conf.save_dir, f"buffer_{i}.pt")
+        model_path = os.path.join(conf.save_dir, f"model_{max_round}.pt")
+        buffer_path = os.path.join(conf.save_dir, f"buffer_{max_round}.pt")
         model.train_model(
             buffer,
             epochs=conf.train_epochs,
@@ -284,12 +287,8 @@ def train(conf: TrainConfig):
         )
         model.save_checkpoint(model_path)
         buffer.save(buffer_path)
-
+        eval(max_round, conf)
         torch.cuda.empty_cache()
-
-        # === C) Eval ===
-        if i % conf.eval_round == 0:
-            eval(i, conf)
 
     wandb.finish()
 

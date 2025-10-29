@@ -223,14 +223,14 @@ def example_human_vs_random():
         play_and_render(g, p1, p2, r)
 
 
-def example_human_vs_ai():
+def example_human_vs_ai(model_path: str):
     from model import Alpha0Module
     from render import Renderer
     from evaluator import build_pv_fn, build_pv_fn_batch
 
     g = Game()
     r = Renderer()
-    model = Alpha0Module(resume_path="output/model.pt")
+    model = Alpha0Module(resume_path=model_path)
     pv_fn = build_pv_fn(model)
 
     p1 = HumanPlayer(r)
@@ -250,5 +250,4 @@ def example_human_vs_ai():
 
 
 if __name__ == '__main__':
-    # example_human_vs_human()
-    example_human_vs_ai()
+    example_human_vs_human()
