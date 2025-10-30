@@ -1,16 +1,15 @@
 import os
 import time
-from datetime import datetime
-
 import wandb
 import torch
 from tqdm import tqdm
+from datetime import datetime
 from dataclasses import dataclass, asdict
 from concurrent.futures import ThreadPoolExecutor
 
 from game import Game, Player1, Player2
 from model import Alpha0Module
-from evaluator import BatchQueuedEvaluator, build_pv_fn, build_pv_fn_batch
+from evaluator import build_pv_fn, build_pv_fn_batch
 from buffer import ReplayBuffer
 from play import self_play, MCTSPlayer, eval_play
 
@@ -54,26 +53,26 @@ class TrainConfig:
     # mcts
     iterations: int = 490
     c_puct: float = 0.5
-    noise_moves: int = 7
+    noise_moves: int = 5
     noise_eps: float = 0.25
     dirichlet_alpha: float = 0.13  # # 10/board_size
-    warm_moves: int = 11
+    warm_moves: int = 15
     tau: float = 1.0
     # model_train
     save_dir: str = "output"
     resume_model_path: str = None
-    resume_buffer_path: str = None
-    train_epochs: int = 2000
+    resume_buffer_path: str = "output/buffer_10.pt"
+    train_epochs: int = 1000
     log_interval: int = 250
-    lr: float = 1e-3
+    lr: float = 5e-4
     weight_decay: float = 1e-4
     batch_size: int = 256
     value_coef: float = 1.0
     # train
     center_round: int = 400  # 首子居中局数
     total_round: int = 100000  # 总训练局数
-    collect_round: int = 10  # 收集局数
-    collect_actors: int = 32  # 收集并发
+    collect_round: int = 5  # 收集局数
+    collect_actors: int = 5  # 收集并发
     # eval
     eval_round: int = 20  # eval局数
     eval_interval: int = 20  # eval间隔局数 = collect_round * eval_interval
@@ -91,7 +90,7 @@ def evaluate(round: int, conf: TrainConfig):
         iterations=conf.iterations,
         c_puct=conf.c_puct,
         warm_moves=0,
-        tau=conf.tau,
+        tau=0.0,
         noise_moves=0,
         noise_eps=conf.noise_eps,
         dirichlet_alpha=conf.dirichlet_alpha,
@@ -103,7 +102,7 @@ def evaluate(round: int, conf: TrainConfig):
         iterations=conf.iterations,
         c_puct=conf.c_puct,
         warm_moves=0,
-        tau=conf.tau,
+        tau=0.0,
         noise_moves=0,
         noise_eps=conf.noise_eps,
         dirichlet_alpha=conf.dirichlet_alpha,
@@ -156,7 +155,7 @@ def parallel_train(conf: TrainConfig):
     os.makedirs(conf.save_dir, exist_ok=True)
     model = Alpha0Module(lr=conf.lr, weight_decay=conf.weight_decay, resume_path=conf.resume_model_path)
     buffer = ReplayBuffer(capacity=50_000, resume_path=conf.resume_buffer_path)
-    pv_fn = build_pv_fn_batch(model, max_batch_size=128, max_timeout_ms=10)
+    pv_fn = build_pv_fn_batch(model, max_batch_size=5, max_timeout_ms=0.01)
     metric = PlayMetric()
 
     wandb.init(
@@ -194,17 +193,17 @@ def parallel_train(conf: TrainConfig):
         max_round = i + conf.collect_round
         rounds = range(i, max_round)
 
-        metrics = []
-        with ThreadPoolExecutor(max_workers=conf.collect_actors) as executor:
-            futures = [executor.submit(collect_one, r) for r in rounds]
-            for fut in tqdm(futures, desc="Collecting", unit="round"):
-                step, winner, trajectory = fut.result()
-                buffer.add_trajectory(trajectory)
-                metrics.append(metric.update(winner, step))
-
-        for r in metrics:
-            # print(r)
-            wandb.log(r)
+        # metrics = []
+        # with ThreadPoolExecutor(max_workers=conf.collect_actors) as executor:
+        #     futures = [executor.submit(collect_one, r) for r in rounds]
+        #     for fut in tqdm(futures, desc="Collecting", unit="round"):
+        #         step, winner, trajectory = fut.result()
+        #         buffer.add_trajectory(trajectory)
+        #         metrics.append(metric.update(winner, step))
+        #
+        # for r in metrics:
+        #     # print(r)
+        #     wandb.log(r)
 
         print(f"[Collect] consume: {time.time() - start: .2f}sec, rounds: {len(rounds)}")
 
@@ -219,7 +218,7 @@ def parallel_train(conf: TrainConfig):
             value_coef=conf.value_coef,
         )
         model.save_checkpoint(model_path)
-        buffer.save(buffer_path)
+        # buffer.save(buffer_path)
         evaluate(max_round, conf)
         torch.cuda.empty_cache()
 
