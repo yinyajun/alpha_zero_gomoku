@@ -52,11 +52,11 @@ class TrainConfig:
     win_num: int = Game.win_num
     # mcts
     iterations: int = 490
-    c_puct: float = 0.5
+    c_puct: float = 0.8
     noise_moves: int = 5
     noise_eps: float = 0.25
     dirichlet_alpha: float = 0.13  # # 10/board_size
-    warm_moves: int = 15
+    warm_moves: int = 10
     tau: float = 1.0
     # model_train
     save_dir: str = "output"
@@ -67,7 +67,7 @@ class TrainConfig:
     lr: float = 5e-4
     weight_decay: float = 1e-4
     batch_size: int = 256
-    value_coef: float = 1.0
+    value_coef: float = 0.5
     # train
     center_round: int = 400  # 首子居中局数
     total_round: int = 100000  # 总训练局数

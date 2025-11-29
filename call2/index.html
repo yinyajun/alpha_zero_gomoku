@@ -1,0 +1,436 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+
+  <style>
+    :root{
+      --ui-left: 50%;
+      --ui-width: 78%;
+      --slider-h: 90px;
+
+      --pad: 3px;
+      --knob: calc(var(--slider-h) - var(--pad)*2);
+
+      --radius: 52px;
+      --ios-green: #20d760;
+      --soft-white: rgba(255,255,255,.94);
+
+      /* Status bar tuning */
+      --sb-top: 20px;
+      --sb-pad-x: 26px;
+      --sb-gap: 6px;
+
+      --sig-w: 24px;
+      --sig-h: 12px;
+      --sig-scale: 1;
+      --sig-y: 0px;
+
+      --wifi-w: 19px;
+      --wifi-h: 12px;
+      --wifi-scale: 1;
+      --wifi-y: 0px;
+
+      --bat-w: 28px;
+      --bat-h: 12px;
+      --bat-scale: 1;
+      --bat-y: 0px;
+    }
+
+    *{ box-sizing:border-box; }
+    body{
+      margin:0; min-height:100vh; display:grid; place-items:center;
+      background:#111;
+    }
+
+    .phone-card{
+      position: relative;
+      width: min(90vw, 390px);
+      aspect-ratio: 9 / 19.5;
+      overflow: hidden;
+      border-radius: var(--radius);
+      background:#000;
+    }
+
+    .avatar{
+      position:absolute; inset:0;
+      width:100%; height:100%;
+      object-fit: cover;
+      transform: scale(1.05);
+      animation: subtleZoom 10s ease-in-out infinite;
+    }
+
+    .call-ui{
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      text-rendering: optimizeLegibility;
+
+      position:absolute; inset:0;
+      text-align:center;
+      font-family:
+        system-ui, -apple-system,
+        "SF Pro Display", "SF Pro Text",
+        "Helvetica Neue", Arial, sans-serif;
+      pointer-events:none;
+      color: var(--soft-white);
+
+      background:
+        radial-gradient(120% 80% at 50% 10%, rgba(0,0,0,.18), transparent 55%),
+        radial-gradient(120% 90% at 50% 100%, rgba(0,0,0,.72), transparent 60%),
+        linear-gradient(to bottom, rgba(0,0,0,.10), rgba(0,0,0,.38));
+    }
+
+    /* status bar */
+    .status-bar{
+      position:absolute;
+      top: var(--sb-top); left:0; right:0;
+      padding: 0 var(--sb-pad-x);
+      display:flex; align-items:center; justify-content:space-between;
+      font-size:17px;
+      font-weight:600;
+      letter-spacing:.2px;
+      line-height:1.2;
+      pointer-events:none;
+      color: var(--soft-white);
+    }
+
+    .status-right{
+      display:flex; align-items:center;
+      gap: var(--sb-gap);
+      color: var(--soft-white);
+      opacity:1;
+    }
+    .status-right svg{
+      display:block;
+      color: currentColor;
+      filter: drop-shadow(0 1px 1px rgba(0,0,0,.25));
+    }
+
+    .sb-signal{
+      width: var(--sig-w);
+      height: var(--sig-h);
+      transform: translateY(var(--sig-y)) scale(var(--sig-scale));
+      transform-origin: center;
+    }
+    .sb-wifi{
+      width: var(--wifi-w);
+      height: var(--wifi-h);
+      transform: translateY(var(--wifi-y)) scale(var(--wifi-scale));
+      transform-origin: center;
+    }
+    .sb-battery{
+      width: var(--bat-w);
+      height: var(--bat-h);
+      transform: translateY(var(--bat-y)) scale(var(--bat-scale));
+      transform-origin: center;
+    }
+
+    .name{
+      margin-top:120px;
+      font-size:34px;
+      font-weight:400;
+      letter-spacing:0.1px;
+      line-height:1.08;
+      animation: fadeInUp .6s ease both;
+      text-shadow:
+        0 1px 2px rgba(0,0,0,.15),
+        0 0 8px rgba(0,0,0,.18);
+    }
+
+    .sub{
+      margin-top:4px;
+      font-size:22px;
+      font-weight:400;
+      letter-spacing:-.1px;
+      line-height:1.25;
+      animation: fadeInUp .8s ease both;
+      color: rgba(255,255,255,0.48);
+      opacity: .8;
+      text-shadow:
+        0 1px 2px rgba(0,0,0,.15),
+        0 0 8px rgba(0,0,0,.18);
+    }
+
+    .quick-row{
+      position:absolute;
+      left:var(--ui-left);
+      bottom:258px;
+      width:var(--ui-width);
+      transform:translateX(-50%);
+      display:flex; justify-content:space-between;
+      padding:0 22px;
+      pointer-events:none;
+    }
+
+    .quick{
+      display:grid;
+      justify-items:center;
+      gap:6px;
+    }
+
+    .quick-ico{
+      width:20px; height:20px;
+      color:var(--soft-white);
+      opacity:1;
+    }
+
+    .quick-txt{
+      font-size:15px;
+      font-weight:400;
+      opacity:.9;
+      letter-spacing:.2px;
+      line-height:1.4;
+    }
+
+    .slide-bar{
+      position:absolute; left:var(--ui-left); bottom:134px;
+      width:var(--ui-width); height:var(--slider-h);
+      transform:translateX(-50%);
+      border-radius:999px;
+      display:flex; align-items:center;
+      padding:var(--pad);
+      overflow:hidden;
+
+      background: rgba(255,255,255,.16);
+      backdrop-filter: blur(4px) saturate(1.2);
+      -webkit-backdrop-filter: blur(2px) saturate(1.2);
+
+      pointer-events:auto;
+      user-select:none;
+      touch-action:none;
+
+      box-shadow:
+        0 0 0 1px rgba(255,255,255,.01) inset,
+        0 0px 4px rgba(0,0,0,.05);
+    }
+
+    .knob{
+      width:var(--knob); height:var(--knob);
+      border-radius:50%;
+      background:#fff;
+      display:grid; place-items:center;
+
+      transform: translateX(0);
+      will-change: transform;
+      cursor:grab;
+      pointer-events:auto;
+
+      box-shadow:
+        0 1px 2px rgba(0,0,0,.18),
+        0 6px 18px rgba(0,0,0,.22);
+
+      position: relative;
+      z-index: 2;
+    }
+    .knob:active{cursor:grabbing}
+
+    .phone-ico{
+      width:30px; height:30px;
+      color:var(--ios-green);
+      transform: translateY(1px);
+      filter:drop-shadow(0 1px 1px rgba(0,0,0,.25));
+    }
+
+    .hint{
+      position: absolute;
+      inset: 0 auto 0 0;
+
+      width: calc(100% - var(--knob) - var(--pad)*2);
+      margin-left: calc(var(--knob) + var(--pad)*2);
+
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      text-align:center;
+
+      font-size:20px; font-weight:400;
+      letter-spacing:.2px;
+      line-height:1.2;
+      text-transform:lowercase;
+      pointer-events:none;
+
+      color: var(--soft-white);
+      text-shadow:
+        0 1px 2px rgba(0,0,0,.15),
+        0 0 8px rgba(0,0,0,.18);
+
+      z-index: 1;
+      transition: opacity .2s ease, width .2s ease, margin-left .2s ease;
+    }
+
+    .slide-bar.answered .hint{
+      width: calc(100% - var(--knob) - var(--pad)*2);
+      margin-left: 0;
+      inset: 0 auto 0 0;
+      opacity: 1;
+    }
+
+    .slide-bar:not(.answered) .hint{ transform: translateX(-8px); }
+    .slide-bar.answered .hint{ transform: translateX(6px); }
+
+    .slide-bar.answered{
+      background: rgba(32,215,96,.22);
+      backdrop-filter: blur(14px) saturate(1.2);
+      -webkit-backdrop-filter: blur(14px) saturate(1.2);
+    }
+
+    @keyframes fadeInUp{
+      from{opacity:0;transform:translateY(10px)}
+      to{opacity:1;transform:translateY(0)}
+    }
+    @keyframes subtleZoom{
+      0%,100%{transform:scale(1.05)}
+      50%{transform:scale(1.10)}
+    }
+  </style>
+</head>
+
+<body>
+<div class="phone-card">
+  <img class="avatar" src="./user.webp" alt=""/>
+
+  <div class="call-ui">
+    <div class="status-bar" aria-hidden="true">
+      <div class="status-time">00:00</div>
+
+      <div class="status-right" aria-hidden="true">
+        <!-- Cellular Signal -->
+        <svg class="sb-signal" viewBox="0 0 25.2051 16.9629" aria-hidden="true">
+          <path d="M21.4648 16.9531L23.8281 16.9531C24.4434 16.9531 24.8438 16.5234 24.8438 15.9082L24.8438 4.3457C24.8438 3.73047 24.4434 3.30078 23.8281 3.30078L21.4648 3.30078C20.8496 3.30078 20.4395 3.73047 20.4395 4.3457L20.4395 15.9082C20.4395 16.5234 20.8496 16.9531 21.4648 16.9531Z" fill="currentColor" fill-opacity="0.85"/>
+          <path d="M14.6484 16.9531L17.002 16.9531C17.6172 16.9531 18.0273 16.5234 18.0273 15.9082L18.0273 7.39258C18.0273 6.77734 17.6172 6.34766 17.002 6.34766L14.6484 6.34766C14.0332 6.34766 13.623 6.77734 13.623 7.39258L13.623 15.9082C13.623 16.5234 14.0332 16.9531 14.6484 16.9531Z" fill="currentColor" fill-opacity="0.85"/>
+          <path d="M7.8418 16.9531L10.1953 16.9531C10.8105 16.9531 11.2207 16.5234 11.2207 15.9082L11.2207 10.4492C11.2207 9.83398 10.8105 9.4043 10.1953 9.4043L7.8418 9.4043C7.22656 9.4043 6.81641 9.83398 6.81641 10.4492L6.81641 15.9082C6.81641 16.5234 7.22656 16.9531 7.8418 16.9531Z" fill="currentColor" fill-opacity="0.85"/>
+          <path d="M1.02539 16.9531L3.37891 16.9531C3.99414 16.9531 4.4043 16.5234 4.4043 15.9082L4.4043 13.5059C4.4043 12.8906 3.99414 12.4609 3.37891 12.4609L1.02539 12.4609C0.410156 12.4609 0 12.8906 0 13.5059L0 15.9082C0 16.5234 0.410156 16.9531 1.02539 16.9531Z" fill="currentColor" fill-opacity="0.85"/>
+        </svg>
+
+        <!-- Wi-Fi -->
+        <svg class="sb-wifi" viewBox="0 0 22.8448 16.2402" aria-hidden="true">
+          <path d="M1.4761 6.8457C1.67141 7.03125 1.94485 7.03125 2.13039 6.83594C4.53274 4.28711 7.6968 2.93945 11.2417 2.93945C14.8062 2.93945 17.9898 4.29688 20.3726 6.8457C20.5484 7.02148 20.812 7.01172 21.0073 6.82617L22.355 5.47852C22.5308 5.30273 22.521 5.08789 22.3843 4.92188C20.0894 2.08984 15.773 0.00976562 11.2417 0.00976562C6.72024 0.00976562 2.3843 2.08984 0.0991432 4.92188C-0.0375756 5.08789-0.0375756 5.30273 0.12844 5.47852Z" fill="currentColor" opacity="0.85"/>
+          <path d="M5.52883 10.9277C5.74367 11.1328 6.00735 11.1035 6.20266 10.8887C7.37453 9.58984 9.2886 8.64258 11.2417 8.65234C13.2144 8.64258 15.1284 9.61914 16.3198 10.918C16.4956 11.123 16.7398 11.1133 16.9546 10.918L18.4683 9.41406C18.6245 9.25781 18.6441 9.04297 18.4976 8.86719C17.023 7.06055 14.2886 5.70312 11.2417 5.70312C8.19485 5.70312 5.46047 7.06055 3.98586 8.86719C3.83938 9.04297 3.84914 9.23828 4.01516 9.41406Z" fill="currentColor" opacity="0.85"/>
+          <path d="M11.2417 16.2402C11.4566 16.2402 11.6421 16.1426 12.023 15.7715L14.4058 13.4863C14.5523 13.3398 14.5913 13.125 14.4546 12.9492C13.8198 12.1289 12.6187 11.416 11.2417 11.416C9.82571 11.416 8.62453 12.1582 7.98977 13.0078C7.89211 13.1641 7.93117 13.3398 8.08742 13.4863L10.4605 15.7715C10.8413 16.1328 11.0269 16.2402 11.2417 16.2402Z" fill="currentColor" opacity="0.85"/>
+        </svg>
+
+        <!-- Battery -->
+        <svg class="sb-battery" viewBox="0 0 29.2676 13.2129" aria-hidden="true">
+          <path d="M5.20508 13.2129L20.5566 13.2129C22.2266 13.2129 23.6328 13.0566 24.6289 12.0605C25.625 11.0645 25.7715 9.67773 25.7715 8.00781L25.7715 5.20508C25.7715 3.53516 25.625 2.14844 24.6289 1.15234C23.6328 0.15625 22.2266 0 20.5566 0L5.20508 0C3.53516 0 2.12891 0.15625 1.13281 1.15234C0.136719 2.14844 0 3.53516 0 5.20508L0 8.00781C0 9.67773 0.136719 11.0645 1.13281 12.0605C2.12891 13.0566 3.53516 13.2129 5.20508 13.2129Z" fill="currentColor" fill-opacity="0.425"/>
+          <path d="M4.42383 10.5078L21.3477 10.5078C22.0215 10.5078 22.4121 10.4102 22.6855 10.1367C22.959 9.86328 23.0566 9.47266 23.0566 8.79883L23.0566 4.41406C23.0566 3.74023 22.959 3.34961 22.6855 3.07617C22.4121 2.80273 22.0215 2.70508 21.3477 2.70508L4.42383 2.70508C3.75 2.70508 3.35938 2.80273 3.08594 3.07617C2.8125 3.34961 2.71484 3.74023 2.71484 4.41406L2.71484 8.79883C2.71484 9.47266 2.8125 9.86328 3.08594 10.1367C3.35938 10.4102 3.75 10.5078 4.42383 10.5078Z" fill="currentColor" fill-opacity="0.85"/>
+        </svg>
+      </div>
+    </div>
+
+    <div class="name">Future You</div>
+    <div class="sub">mobile</div>
+
+    <!-- bottom quick actions -->
+    <div class="quick-row">
+      <!-- 左：Remind Me -> 闹钟 -->
+      <div class="quick">
+        <svg class="quick-ico" viewBox="0 0 19.0332 21.9238" aria-hidden="true">
+          <path d="M9.33594 20.2539C14.4922 20.2539 18.6719 16.0742 18.6719 10.918C18.6719 5.76172 14.4922 1.57227 9.33594 1.57227C4.17969 1.57227 0 5.76172 0 10.918C0 16.0742 4.17969 20.2539 9.33594 20.2539ZM4.89258 11.9922C4.51172 11.9922 4.21875 11.6992 4.21875 11.3184C4.21875 10.9375 4.51172 10.6348 4.89258 10.6348L8.65234 10.6348L8.65234 5.40039C8.65234 5.01953 8.94531 4.7168 9.32617 4.7168C9.70703 4.7168 10.0098 5.01953 10.0098 5.40039L10.0098 11.3184C10.0098 11.6992 9.70703 11.9922 9.32617 11.9922ZM1.31836 4.08203C1.46484 4.08203 1.57227 4.0625 1.70898 3.95508L4.98047 1.48438C5.13672 1.36719 5.22461 1.21094 5.22461 1.04492C5.22461 0.839844 5.12695 0.673828 4.96094 0.517578C4.58984 0.185547 3.92578 0 3.33984 0C1.81641 0 0.595703 1.2207 0.595703 2.74414C0.595703 3.10547 0.654297 3.4668 0.761719 3.69141C0.869141 3.93555 1.07422 4.08203 1.31836 4.08203ZM17.3535 4.08203C17.5977 4.08203 17.8027 3.92578 17.9199 3.69141C18.0176 3.47656 18.0762 3.10547 18.0762 2.74414C18.0762 1.2207 16.8652 0 15.332 0C14.7461 0 14.082 0.185547 13.7109 0.517578C13.5449 0.673828 13.4473 0.839844 13.4473 1.04492C13.4473 1.21094 13.5352 1.36719 13.7012 1.48438L16.9629 3.95508C17.1094 4.0625 17.207 4.08203 17.3535 4.08203ZM1.17188 19.9707C1.46484 20.2734 1.94336 20.2734 2.24609 19.9609L4.0918 18.125L3.03711 17.0801L1.18164 18.916C0.878906 19.209 0.888672 19.6875 1.17188 19.9707ZM17.5 19.9707C17.793 19.6875 17.793 19.209 17.4902 18.916L15.6348 17.0801L14.5898 18.125L16.4258 19.9609C16.7285 20.2734 17.207 20.2734 17.5 19.9707Z"
+                fill="currentColor" fill-opacity="1.0"/>
+        </svg>
+        <div class="quick-txt">Remind Me</div>
+      </div>
+
+      <!-- 右：Message -> 气泡 -->
+      <div class="quick">
+        <svg class="quick-ico" viewBox="0 0 22.9492 20.3418" aria-hidden="true">
+          <path d="M11.2891 18.7891C17.8418 18.7891 22.5879 14.834 22.5879 9.39453C22.5879 3.94531 17.832 0 11.2891 0C4.74609 0 0 3.94531 0 9.39453C0 13.3105 2.14844 14.3652 2.14844 16.1133C2.14844 16.875 1.9043 17.373 1.31836 17.9199C0.878906 18.3105 1.11328 18.7891 1.75781 18.7891C3.10547 18.7891 4.48242 18.3496 5.48828 17.6172C7.17773 18.3887 9.14062 18.7891 11.2891 18.7891Z"
+                fill="currentColor" fill-opacity="1.0"/>
+        </svg>
+        <div class="quick-txt">Message</div>
+      </div>
+    </div>
+
+    <!-- slide to answer -->
+    <div class="slide-bar" id="slideBar">
+      <div class="knob" id="knob">
+        <!-- knob 里：Phone handset -->
+        <svg class="phone-ico" viewBox="0 0 18.5645 18.2324" aria-hidden="true">
+          <path d="M5 13.1543C7.87109 16.0352 11.3086 18.2227 14.0723 18.2227C15.3711 18.2227 16.5039 17.7051 17.2461 16.875C17.959 16.0742 18.2031 15.4785 18.2031 14.9512C18.2031 14.541 17.9492 14.1602 17.3047 13.7109L14.9219 12.002C14.3262 11.582 14.0625 11.5039 13.7109 11.5039C13.4082 11.5039 13.1543 11.5625 12.6465 11.8359L11.084 12.6953C10.8984 12.8027 10.8203 12.8223 10.6836 12.8223C10.498 12.8223 10.3711 12.7734 10.1855 12.6953C9.44336 12.3535 8.39844 11.5332 7.4707 10.6055C6.54297 9.67773 5.82031 8.73047 5.44922 7.99805C5.40039 7.90039 5.3418 7.74414 5.3418 7.58789C5.3418 7.46094 5.41016 7.35352 5.48828 7.2168L6.40625 5.64453C6.66016 5.21484 6.72852 4.98047 6.72852 4.64844C6.72852 4.26758 6.60156 3.85742 6.24023 3.33984L4.59961 1.05469C4.13086 0.400391 3.7793 0 3.25195 0C2.59766 0 1.80664 0.498047 1.24023 1.04492C0.429688 1.82617 0 2.91992 0 4.15039C0 6.93359 2.13867 10.3027 5 13.1543Z"
+                fill="currentColor"/>
+        </svg>
+      </div>
+      <div class="hint" id="hint">slide to answer</div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+(() => {
+  const bar = document.getElementById('slideBar');
+  const knob = document.getElementById('knob');
+  const hint = document.getElementById('hint');
+
+  let dragging = false;
+  let startX = 0;
+  let currentX = 0;
+  let maxX = 0;
+  let answered = false;
+
+  const calcMax = () => {
+    const barW = bar.clientWidth;
+    const knobW = knob.clientWidth;
+    const pad = parseFloat(getComputedStyle(bar).paddingLeft);
+    maxX = barW - knobW - pad * 2;
+  };
+  calcMax();
+  window.addEventListener('resize', calcMax);
+
+  const setX = (x) => {
+    currentX = Math.max(0, Math.min(maxX, x));
+    knob.style.transform = `translateX(${currentX}px)`;
+    const t = maxX ? currentX / maxX : 0;
+    hint.style.opacity = String(1 - t * 1.5);
+  };
+
+  const onDown = (e) => {
+    if (answered) return;
+    dragging = true;
+    startX = (e.touches ? e.touches[0].clientX : e.clientX) - currentX;
+    knob.setPointerCapture?.(e.pointerId);
+  };
+
+  const onMove = (e) => {
+    if (!dragging || answered) return;
+    const x = (e.touches ? e.touches[0].clientX : e.clientX) - startX;
+    setX(x);
+  };
+
+  const onUp = () => {
+    if (!dragging || answered) return;
+    dragging = false;
+
+    const threshold = maxX * 0.78;
+    if (currentX >= threshold) {
+      answered = true;
+      setX(maxX);
+      bar.classList.add('answered');
+      hint.textContent = 'answered';
+      hint.style.opacity = '1';
+    } else {
+      const from = currentX;
+      const dur = 220;
+      const t0 = performance.now();
+      const anim = (t) => {
+        const p = Math.min(1, (t - t0) / dur);
+        const ease = 1 - Math.pow(1 - p, 3);
+        setX(from * (1 - ease));
+        if (p < 1) requestAnimationFrame(anim);
+      };
+      requestAnimationFrame(anim);
+    }
+  };
+
+  knob.addEventListener('pointerdown', onDown);
+  window.addEventListener('pointermove', onMove);
+  window.addEventListener('pointerup', onUp);
+
+  knob.addEventListener('touchstart', onDown, { passive:false });
+  window.addEventListener('touchmove', onMove, { passive:false });
+  window.addEventListener('touchend', onUp);
+})();
+</script>
+</body>
+</html>
