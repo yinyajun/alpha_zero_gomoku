@@ -19,7 +19,6 @@
           --ios-red: #FF453A;
           --soft-white: rgba(255,255,255,.95);
 
-
           /* ===== Status bar pixel tuning ===== */
           --sb-top: 28px;
           --sb-pad-x: 30px;
@@ -60,6 +59,25 @@
           overflow:hidden;
         }
 
+        .end-mask{
+          position:absolute;
+          inset:0;
+          background: radial-gradient(120% 80% at 50% 0%, rgba(0,0,0,0.2), transparent 60%), rgba(0,0,0,0.8);
+          opacity:0;
+          pointer-events:none;
+          transition: opacity .35s ease;
+          z-index: 999;
+        }
+
+        .phone-card.ended .end-mask{
+          opacity:1;
+          pointer-events:auto;
+        }
+
+        .phone-card.ended .call-ui{
+          pointer-events:none;
+        }
+
         .phone-card{
           position: relative;
           width: min(90vw, 390px);
@@ -88,7 +106,6 @@
             "SF Pro Display","SF Pro Text","Helvetica Neue",Arial,sans-serif;
           color: var(--soft-white);
 
-          /* ✅ 必须允许事件进入子树，否则 knob 完全收不到事件 */
           pointer-events:auto;
 
           background:
@@ -97,7 +114,6 @@
             linear-gradient(to bottom, rgba(0,0,0,.10), rgba(0,0,0,.38));
         }
 
-        /* 仅这些 UI 不需要交互 */
         .status-bar,
         .name, .sub,
         .quick-row,
@@ -106,7 +122,6 @@
           pointer-events:none;
         }
 
-        /* ===== status bar ===== */
         .status-bar{
           position:absolute;
           top: var(--sb-top); left:0; right:0;
@@ -174,7 +189,6 @@
             0 0 8px rgba(0,0,0,.18);
         }
 
-        /* quick row */
         .quick-row{
           position:absolute;
           z-index: 6;
@@ -201,7 +215,6 @@
           text-shadow: 0 0px 4px rgba(0,0,0,.4);
         }
 
-        /* ===== Slider ===== */
         .slide-bar{
           position:absolute;
           left:var(--ui-left);
@@ -276,7 +289,7 @@
           display:grid; place-items:center;
           transform: translateX(0);
           cursor:grab;
-          pointer-events:auto; /* ✅ knob 可交互 */
+          pointer-events:auto;
           box-shadow:
             0 1px 2px rgba(0,0,0,.18),
             0 6px 18px rgba(0,0,0,.22);
@@ -294,7 +307,6 @@
           transform: translateY(1px);
         }
 
-        /* ===== Answered (3 circles) ===== */
         .answered-row{
           position:absolute;
           z-index: 2;
@@ -315,7 +327,6 @@
           display:grid;
           justify-items:center;
           gap: 0;
-          text-shadow:0 1px 2px rgba(0,0,0,.25);
           pointer-events:auto;
           user-select:none;
 
@@ -323,11 +334,13 @@
           color: rgba(255,255,255,0.95);
           letter-spacing:.2px;
           text-shadow: 0 0px 4px rgba(0,0,0,.4);
+          cursor:pointer;
+          -webkit-tap-highlight-color: transparent;
         }
 
         .answered-btn > div:last-child{
           position: absolute;
-          top: calc(100% + var(--ans-label-gap)); /* 圆下面留出距离 */
+          top: calc(100% + var(--ans-label-gap));
           left: var(--ui-left);
           transform: translateX(-50%);
           white-space: nowrap;
@@ -359,10 +372,7 @@
           filter: drop-shadow(0 1px 1px rgba(0,0,0,.25));
         }
 
-        /* ===== answered state toggles ===== */
-        .answered .quick-row{
-          opacity:0;
-        }
+        .answered .quick-row{ opacity:0; }
         .answered .slide-bar{
           opacity:0;
           pointer-events:none;
@@ -434,7 +444,7 @@
         </div>
 
         <div class="name">Future You</div>
-        <div class="sub">mobile</div>
+        <div class="sub" id="subText">mobile</div>
 
         <!-- quick actions -->
         <div class="quick-row">
@@ -476,19 +486,26 @@
 
         <!-- Answered actions -->
         <div class="answered-row" id="answeredRow">
-            <div class="answered-btn">
+            <div class="answered-btn" id="btnMute" role="button" aria-label="Mute">
                 <div class="answered-circle glass">
-                    <svg class="answered-ico" viewBox="0 0 20.5737 21.9971" aria-hidden="true">
+                    <svg class="answered-ico ico-mute" viewBox="0 0 20.5737 21.9971" aria-hidden="true">
                         <path d="M14.7456 18.8456C14.6182 19.3076 14.2143 19.6167 13.6853 19.6167C13.2361 19.6167 12.8552 19.4312 12.406 19.0015L8.24586 15.0562C8.1775 14.9976 8.09937 14.9683 8.00172 14.9683L5.19898 14.9683C3.88062 14.9683 3.15797 14.2456 3.15797 12.8296L3.15797 9.1968C3.15797 8.56128 3.30556 8.06338 3.59041 7.70997ZM14.7888 3.5425L14.7888 13.5358L8.23109 6.98189C8.23614 6.97838 8.24102 6.97438 8.24586 6.97024L12.406 3.06399C12.9041 2.58547 13.2166 2.39016 13.6658 2.39016C14.3298 2.39016 14.7888 2.90774 14.7888 3.5425Z"
                               fill="currentColor" fill-opacity="0.95"/>
                         <path d="M18.158 20.6421C18.4509 20.9351 18.9294 20.9351 19.2224 20.6421C19.5056 20.3394 19.5154 19.8706 19.2224 19.5777L2.4939 2.85891C2.20093 2.56594 1.71265 2.56594 1.41968 2.85891C1.13648 3.14211 1.13648 3.64016 1.41968 3.92336Z"
                               fill="currentColor" fill-opacity="0.95"/>
                     </svg>
+
+                    <!-- Speaker icon (默认隐藏) -->
+                    <svg class="answered-ico ico-speak" viewBox="0 0 14.2578 17.2363" aria-hidden="true"
+                         style="display:none">
+                        <path d="M10.5273 17.2363C11.1719 17.2363 11.6309 16.7773 11.6309 16.1426L11.6309 1.16211C11.6309 0.527344 11.1719 0.00976562 10.5078 0.00976562C10.0586 0.00976562 9.74609 0.205078 9.24805 0.683594L5.08789 4.58984C5.01953 4.64844 4.94141 4.67773 4.84375 4.67773L2.04102 4.67773C0.722656 4.67773 0 5.41016 0 6.81641L0 10.4492C0 11.8652 0.722656 12.5879 2.04102 12.5879L4.84375 12.5879C4.94141 12.5879 5.01953 12.6172 5.08789 12.6758L9.24805 16.6211C9.69727 17.0508 10.0781 17.2363 10.5273 17.2363Z"
+                              fill="currentColor" fill-opacity="0.95"/>
+                    </svg>
                 </div>
-                <div>Mute</div>
+                <div class="label-mute">Mute</div>
             </div>
 
-            <div class="answered-btn">
+            <div class="answered-btn" id="btnEnd" role="button" aria-label="End">
                 <div class="answered-circle red">
                     <svg class="answered-ico" viewBox="0 0 23.4375 8.38867" aria-hidden="true">
                         <path d="M11.5332 0C7.73438 0 3.4082 0.683594 1.29883 2.86133C0.488281 3.68164 0 4.70703 0 6.00586C0 6.89453 0.283203 8.21289 1.31836 8.31055C1.60156 8.38867 1.875 8.35938 2.22656 8.30078L5.10742 7.82227C6.10352 7.65625 6.57227 7.28516 6.83594 6.32812L7.31445 4.60938C7.41211 4.25781 7.50977 4.14062 7.92969 3.98438C8.71094 3.70117 10 3.54492 11.5332 3.54492C13.0762 3.54492 14.3652 3.70117 15.1465 3.98438C15.5664 4.14062 15.6641 4.25781 15.752 4.60938L16.2402 6.32812C16.5039 7.28516 16.9727 7.65625 17.9688 7.82227L20.8496 8.30078C21.1914 8.35938 21.4648 8.38867 21.748 8.31055C22.793 8.21289 23.0762 6.89453 23.0762 6.00586C23.0762 4.70703 22.5879 3.68164 21.7773 2.86133C19.668 0.683594 15.3418 0 11.5332 0Z"
@@ -498,27 +515,41 @@
                 <div>End</div>
             </div>
 
-            <div class="answered-btn">
+            <div class="answered-btn" id="btnPause" role="button" aria-label="Pause">
                 <div class="answered-circle glass">
-                    <svg class="answered-ico" viewBox="0 0 28.8281 14.9316" aria-hidden="true">
-                        <path d="M0 13.5645C0 14.4824 0.527344 14.9219 1.16211 14.9219C1.43555 14.9219 1.72852 14.834 2.01172 14.6777L12.2656 8.70117C13.0078 8.27148 13.291 7.94922 13.291 7.46094C13.291 6.97266 13.0078 6.65039 12.2656 6.2207L2.01172 0.244141C1.72852 0.078125 1.43555 0 1.16211 0C0.527344 0 0 0.429688 0 1.34766ZM17.8516 14.8633L20.0684 14.8633C20.9277 14.8633 21.3672 14.4141 21.3672 13.5547L21.3672 1.35742C21.3672 0.458984 20.9277 0.0488281 20.0684 0.0488281L17.8516 0.0488281C16.9922 0.0488281 16.543 0.498047 16.543 1.35742L16.543 13.5547C16.543 14.4141 16.9922 14.8633 17.8516 14.8633ZM24.9414 14.8633L27.1582 14.8633C28.0176 14.8633 28.4668 14.4141 28.4668 13.5547L28.4668 1.35742C28.4668 0.458984 28.0176 0.0488281 27.1582 0.0488281L24.9414 0.0488281C24.082 0.0488281 23.6426 0.498047 23.6426 1.35742L23.6426 13.5547C23.6426 14.4141 24.082 14.8633 24.9414 14.8633Z"
+                    <svg class="answered-ico ico-pause" viewBox="0 0 11.914 16.1582" aria-hidden="true">
+                        <path d="M1.30489 16.1458L3.52445 16.1458C4.3731 16.1458 4.81898 15.6999 4.81898 14.8409L4.81898 1.3049C4.81898 0.404486 4.3731-1.77636e-15 3.52445-1.77636e-15L1.30489-1.77636e-15C0.445878-1.77636e-15 0 0.445887 0 1.3049L0 14.8409C0 15.6999 0.445878 16.1458 1.30489 16.1458ZM8.39828 16.1458L10.6178 16.1458C11.4665 16.1458 11.9124 15.6999 11.9124 14.8409L11.9124 1.3049C11.9124 0.404486 11.4665-1.77636e-15 10.6178-1.77636e-15L8.39828-1.77636e-15C7.53929-1.77636e-15 7.09341 0.445887 7.09341 1.3049L7.09341 14.8409C7.09341 15.6999 7.53929 16.1458 8.39828 16.1458Z"
+                              fill="currentColor" fill-opacity="0.95"/>
+                    </svg>
+
+                    <!-- Play icon (默认隐藏) -->
+                    <svg class="answered-ico ico-play" viewBox="0 0 16.2891 16.416" aria-hidden="true"
+                         style="display:none">
+                        <path d="M1.70898 14.9805C1.70898 15.9473 2.26562 16.4062 2.92969 16.4062C3.22266 16.4062 3.52539 16.3086 3.82812 16.1523L15.2051 9.50195C16.0156 9.0332 16.2891 8.71094 16.2891 8.20312C16.2891 7.68555 16.0156 7.37305 15.2051 6.9043L3.82812 0.253906C3.52539 0.0878906 3.22266 0 2.92969 0C2.26562 0 1.70898 0.458984 1.70898 1.42578Z"
                               fill="currentColor" fill-opacity="0.95"/>
                     </svg>
                 </div>
-                <div>PlayPause</div>
+                <div class="label-pause">Pause</div>
             </div>
         </div>
-
     </div>
+
+    <div class="end-mask" id="endMask" aria-hidden="true"></div>
+
 </div>
 
 <script>
-    (() => {
+    (()=> {
       const phoneCard = document.getElementById('phoneCard');
       const bar = document.getElementById('slideBar');
       const knob = document.getElementById('knob');
       const hintShimmer = document.getElementById('hintShimmer');
       const hintBase = document.getElementById('hintBase');
+      const subText = document.getElementById('subText');
+
+      const btnMute = document.getElementById('btnMute');
+      const btnEnd = document.getElementById('btnEnd');
+      const btnPause = document.getElementById('btnPause');
 
       let dragging = false;
       let startX = 0;
@@ -526,28 +557,63 @@
       let maxX = 0;
       let answered = false;
 
+      /* ========= Call timer (NEW) ========= */
+      let callSec = 0;
+      let timerId = null;
+      let timerPaused = false;
+
+      const fmtTime = (s) => {
+        const mm = String(Math.floor(s / 60)).padStart(2, '0');
+        const ss = String(s % 60).padStart(2, '0');
+        return `${mm}:${ss}`;
+      };
+
+      const renderTimer = () => {
+        subText.textContent = fmtTime(callSec);
+      };
+
+      const startTimer = () => {
+        stopTimer();
+        callSec = 0;
+        timerPaused = false;
+        renderTimer();
+        timerId = setInterval(() => {
+          if (timerPaused || !answered) return;
+          callSec += 1;
+          renderTimer();
+        }, 1000);
+      };
+
+      const pauseTimer = () => { timerPaused = true; };
+      const resumeTimer = () => { timerPaused = false; };
+
+      const stopTimer = () => {
+        if (timerId) clearInterval(timerId);
+        timerId = null;
+      };
+
       /* ========= Ringing audio ========= */
       const RING_SRC = './ringtone.m4a';
       const FADE_IN_MS = 5000;
-      const START_VOL = 0.02;
-      const TARGET_VOL = 0.1;
+      const START_VOL = 0.05;
+      const TARGET_VOL = 1;
 
-      let audio = new Audio(RING_SRC);
-      audio.loop = true;
-      audio.preload = 'auto';
-      audio.volume = START_VOL;
+      let ringAudio = new Audio(RING_SRC);
+      ringAudio.loop = true;
+      ringAudio.preload = 'auto';
+      ringAudio.volume = START_VOL;
 
       let fadeRaf = null;
       let ringing = false;
       let needUnlock = false;
 
-      function fadeIn() {
+      function fadeInRing() {
         if (fadeRaf) cancelAnimationFrame(fadeRaf);
         const t0 = performance.now();
         const tick = (t) => {
           if (!ringing) return;
           const p = Math.min(1, (t - t0) / FADE_IN_MS);
-          audio.volume = START_VOL + (TARGET_VOL - START_VOL) * p;
+          ringAudio.volume = START_VOL + (TARGET_VOL - START_VOL) * p;
           if (p < 1) fadeRaf = requestAnimationFrame(tick);
         };
         fadeRaf = requestAnimationFrame(tick);
@@ -556,12 +622,12 @@
       async function startRinging({ muted=false } = {}) {
         if (ringing) return;
         ringing = true;
-        audio.currentTime = 0;
-        audio.muted = muted;
-        audio.volume = START_VOL;
+        ringAudio.currentTime = 0;
+        ringAudio.muted = muted;
+        ringAudio.volume = START_VOL;
         try {
-          await audio.play();
-          fadeIn();
+          await ringAudio.play();
+          fadeInRing();
         } catch (e) {
           ringing = false;
           throw e;
@@ -572,8 +638,9 @@
         ringing = false;
         if (fadeRaf) cancelAnimationFrame(fadeRaf);
         fadeRaf = null;
-        audio.pause();
-        audio.currentTime = 0;
+        ringAudio.pause();
+        ringAudio.currentTime = 0;
+        ringAudio.muted = true;
       }
 
       (async () => {
@@ -590,17 +657,82 @@
       })();
 
       function unlockSoundOnce() {
-        if (!needUnlock) return;
+        if (!needUnlock || answered) return;
         needUnlock = false;
+
         if (!ringing) {
           startRinging({ muted:false }).catch(()=>{});
           return;
         }
-        audio.muted = false;
-        fadeIn();
+        ringAudio.muted = false;
+        fadeInRing();
       }
-      window.addEventListener('pointerdown', unlockSoundOnce, { once:true });
-      window.addEventListener('touchstart', unlockSoundOnce, { once:true });
+
+      /* ========= Answer audio ========= */
+      const ANSWER_SRC = './answer.m4a';
+      let answerAudio = null;
+      let needAnswerUnlock = false;
+
+      function hangUp(){
+        stopAnswer();
+        stopRinging();
+        stopTimer();            // ✅ NEW: stop timer on hangup
+        phoneCard.classList.add('ended');
+        answered = false;       // timer interval checks this too
+      }
+
+      function ensureAnswerAudio() {
+        if (!answerAudio) {
+          answerAudio = new Audio(ANSWER_SRC);
+          answerAudio.preload = 'auto';
+          answerAudio.loop = false;
+          answerAudio.muted = false;
+          answerAudio.volume = 1.0;
+
+          answerAudio.addEventListener('ended', () => {
+            if (!answered) return;
+            hangUp(); // ✅ ended also stops timer
+          });
+        }
+        return answerAudio;
+      }
+
+      async function playAnswer({ muted=false } = {}) {
+        const a = ensureAnswerAudio();
+        a.currentTime = 0;
+        a.muted = !!muted;
+        try {
+          await a.play();
+          needAnswerUnlock = false;
+        } catch {
+          // autoplay 被拦：等 answered 后用户再点一次
+          needAnswerUnlock = true;
+        }
+      }
+
+      function stopAnswer() {
+        if (!answerAudio) return;
+        answerAudio.pause();
+        answerAudio.currentTime = 0;
+      }
+
+      // 只在“已接听”状态下才解锁 answer
+      function unlockAnswerIfNeeded() {
+        if (!answered) return;
+        if (!needAnswerUnlock) return;
+        needAnswerUnlock = false;
+        if (!answerAudio) return;
+        answerAudio.muted = false;
+        answerAudio.play().catch(()=>{});
+      }
+
+      if (window.PointerEvent) {
+        window.addEventListener('pointerdown', unlockSoundOnce, { once:true });
+        window.addEventListener('pointerdown', unlockAnswerIfNeeded);
+      } else {
+        window.addEventListener('touchstart', unlockSoundOnce, { once:true });
+        window.addEventListener('touchstart', unlockAnswerIfNeeded);
+      }
 
       /* ========= slider logic ========= */
       const calcMax = () => {
@@ -644,7 +776,12 @@
         hintBase.textContent = '';
         hintShimmer.textContent = '';
         hintShimmer.style.opacity = '1';
-        stopRinging();
+
+        stopRinging();               // ✅ 只有滑到底才停铃声
+        playAnswer({ muted:false }); // ✅ 只有滑到底才播放 answer
+
+        // ✅ NEW: show timer instead of "mobile" and start counting
+        startTimer();
       };
 
       const onUp = () => {
@@ -669,15 +806,73 @@
         requestAnimationFrame(anim);
       };
 
-      knob.addEventListener('pointerdown', onDown);
-      window.addEventListener('pointermove', onMove);
-      window.addEventListener('pointerup', onUp);
-
-      knob.addEventListener('touchstart', onDown, { passive:false });
-      window.addEventListener('touchmove', onMove, { passive:false });
-      window.addEventListener('touchend', onUp);
+      if (window.PointerEvent) {
+        knob.addEventListener('pointerdown', onDown);
+        window.addEventListener('pointermove', onMove);
+        window.addEventListener('pointerup', onUp);
+      } else {
+        knob.addEventListener('touchstart', (e)=>{ e.preventDefault(); onDown(e); }, { passive:false });
+        window.addEventListener('touchmove', (e)=>{ e.preventDefault(); onMove(e); }, { passive:false });
+        window.addEventListener('touchend', onUp);
+      }
 
       setX(0);
+
+      /* ========= answered buttons ========= */
+      let mutedByUser = false;
+      let pausedByUser = false;
+
+      const icoMute = btnMute.querySelector('.ico-mute');
+      const icoSpeak = btnMute.querySelector('.ico-speak');
+      const labelMute = btnMute.querySelector('.label-mute');
+
+      const icoPause = btnPause.querySelector('.ico-pause');
+      const icoPlay = btnPause.querySelector('.ico-play');
+      const labelPause = btnPause.querySelector('.label-pause');
+
+      function setMuteUI(isMuted){
+        icoMute.style.display  = isMuted ? 'none'  : 'block';
+        icoSpeak.style.display = isMuted ? 'block' : 'none';
+        labelMute.textContent  = isMuted ? 'Speak' : 'Mute';
+      }
+
+      function setPlayUI(isPaused){
+        icoPause.style.display = isPaused ? 'none' : 'block';
+        icoPlay.style.display = isPaused ? 'block' : 'none';
+        labelPause.textContent = isPaused ? 'Play' : 'Pause';
+      }
+
+      setMuteUI(false);
+      setPlayUI(false);
+
+      btnEnd.addEventListener('click', () => {
+        if (!answered) return;
+        hangUp(); // ✅ stops timer too
+      });
+
+      btnMute.addEventListener('click', () => {
+        if (!answered) return;
+        const a = ensureAnswerAudio();
+        mutedByUser = !mutedByUser;
+        a.muted = mutedByUser;
+        setMuteUI(mutedByUser);
+      });
+
+      btnPause.addEventListener('click', () => {
+        if (!answered) return;
+        const a = ensureAnswerAudio();
+        if (a.paused) {
+          a.play().catch(()=>{ needAnswerUnlock = true; });
+          pausedByUser = false;
+          resumeTimer();   // ✅ NEW: resume timer on Play
+        } else {
+          a.pause();
+          pausedByUser = true;
+          pauseTimer();    // ✅ NEW: pause timer on Pause
+        }
+        setPlayUI(pausedByUser);
+      });
+
     })();
 </script>
 </body>
