@@ -1,0 +1,1287 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+    <title>Dear</title>
+    <meta charset="utf-8"/>
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"/>
+
+    <style>
+        :root {
+            --ui-left: 50%;
+            --ui-width: 78%;
+            --slider-h: 86px;
+
+            --pad: 4px;
+            --slider-bottom: clamp(90px, 14%, 160px);
+            --quick-gap: 48px;
+            --knob: calc(var(--slider-h) - var(--pad) * 2);
+
+            --radius: 52px;
+            --ios-red: #FF453A;
+            --soft-white: rgba(255, 255, 255, .95);
+
+            /* ===== Status bar pixel tuning ===== */
+            --sb-top: 26px;
+            --sb-pad-x: 40px;
+            --sb-gap: 6px;
+
+            --sig-w: 24px;
+            --sig-h: 12px;
+            --sig-scale: 1;
+            --sig-y: 0px;
+
+            --wifi-w: 19px;
+            --wifi-h: 12px;
+            --wifi-scale: 1;
+            --wifi-y: 0px;
+
+            --bat-w: 28px;
+            --bat-h: 12px;
+            --bat-scale: 1;
+            --bat-y: 0px;
+
+            /* ===== answered actions ===== */
+            --ans-size: var(--knob);
+            --ans-label-gap: 10px;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html, body, .phone-card {
+            -webkit-user-select: none; /* iOS Safari */
+            user-select: none;
+            -webkit-touch-callout: none; /* 长按不弹出复制菜单 */
+        }
+
+        html, body, .phone-card, .call-ui {
+            touch-action: none; /* 现代浏览器禁手势缩放/双击缩放 */
+            -ms-touch-action: none;
+        }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+        }
+
+        body {
+            min-height: 100vh;
+            display: grid;
+            place-items: center;
+            background: #111;
+            overflow: hidden;
+        }
+
+        .end-mask {
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(120% 80% at 50% 0%, rgba(0, 0, 0, 0.2), transparent 60%), rgba(0, 0, 0, 0.8);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity .35s ease;
+            z-index: 999;
+        }
+
+        .phone-card.ended .end-mask {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .phone-card.ended .call-ui {
+            pointer-events: none;
+        }
+
+        .phone-card {
+            position: relative;
+            width: min(90vw, 390px);
+            aspect-ratio: 9 / 19.5;
+            overflow: hidden;
+            border-radius: var(--radius);
+            background: #000;
+        }
+
+        .avatar {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transform: scale(1.05);
+            animation: driftBreath 16s ease-in-out infinite;
+            transition: opacity 0.8s ease;   /* ✅ NEW */
+            opacity: 1;
+        }
+
+        .call-ui {
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            text-rendering: optimizeLegibility;
+
+            position: absolute;
+            inset: 0;
+            text-align: center;
+            font-family: system-ui, -apple-system,
+            "SF Pro Display", "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+            color: var(--soft-white);
+
+            pointer-events: auto;
+
+            background: radial-gradient(120% 80% at 50% 10%, rgba(0, 0, 0, .18), transparent 55%),
+            radial-gradient(120% 90% at 50% 100%, rgba(0, 0, 0, .72), transparent 60%),
+            linear-gradient(to bottom, rgba(0, 0, 0, .10), rgba(0, 0, 0, .38));
+        }
+
+        /* 接听后的轻微变暗遮罩 */
+        .call-ui::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: rgba(0, 0, 0, 0); /* 默认不变暗 */
+            transition: background .35s ease;
+            pointer-events: none;
+            z-index: 1; /* 盖在背景上，但在按钮/文字下面 */
+        }
+
+        /* answered：变暗，但别太深 */
+        .phone-card.answered .call-ui::after {
+            background: rgba(0, 0, 0, 0.1);
+        }
+
+        /* ended：交给 end-mask 处理，避免双重变暗 */
+        .phone-card.ended .call-ui::after {
+            background: rgba(0, 0, 0, 0);
+        }
+
+        /* 确保 UI 内容在遮罩上层 */
+        .call-ui > * {
+            position: relative;
+            z-index: 2;
+        }
+
+        .status-bar,
+        .name, .sub,
+        .quick-row,
+        .track,
+        .hint-wrap {
+            pointer-events: none;
+        }
+
+        .status-bar {
+            position: absolute;
+            top: var(--sb-top);
+            left: 0;
+            right: 0;
+            padding: 0 var(--sb-pad-x);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 16px;
+            font-weight: 600;
+            letter-spacing: .2px;
+            line-height: 1.2;
+            color: var(--soft-white);
+        }
+
+        .status-right {
+            display: flex;
+            align-items: center;
+            gap: var(--sb-gap);
+            color: var(--soft-white);
+        }
+
+        .status-right svg {
+            display: block;
+            color: currentColor;
+            filter: drop-shadow(0 1px 1px rgba(0, 0, 0, .25));
+        }
+
+        .sb-signal {
+            width: var(--sig-w);
+            height: var(--sig-h);
+            transform: translateY(var(--sig-y)) scale(var(--sig-scale));
+            transform-origin: center;
+        }
+
+        .sb-wifi {
+            width: var(--wifi-w);
+            height: var(--wifi-h);
+            transform: translateY(var(--wifi-y)) scale(var(--wifi-scale));
+            transform-origin: center;
+        }
+
+        .sb-battery {
+            width: var(--bat-w);
+            height: var(--bat-h);
+            transform: translateY(var(--bat-y)) scale(var(--bat-scale));
+            transform-origin: center;
+        }
+
+        .name {
+            margin-top: 120px;
+            font-size: 34px;
+            font-weight: 400;
+            letter-spacing: 0.1px;
+            line-height: 1.08;
+            animation: fadeInUp .6s ease both;
+            color: rgba(255, 255, 255, 0.95);
+            text-shadow: 0 1px 2px rgba(0, 0, 0, .15),
+              0 0 8px rgba(0, 0, 0, .18);
+        }
+
+
+        .phone-card.answered .name {
+            left: 10%;
+            text-align: left;
+            animation: fadeInUp .2s ease both;
+        }
+
+        .sub {
+            margin-top: 4px;
+            font-size: 22px;
+            font-weight: 400;
+            letter-spacing: -.1px;
+            line-height: 1.25;
+            animation: fadeInUp .8s ease both;
+            color: rgba(255, 255, 255, 0.55);
+            text-shadow: 0 1px 2px rgba(0, 0, 0, .15),
+            0 0 8px rgba(0, 0, 0, .18);
+        }
+
+        .phone-card.answered .sub {
+            left: 10%;
+            color: rgba(255, 255, 255, 0.9);
+            text-align: left;
+        }
+
+        .quick-row {
+            position: absolute;
+            z-index: 6;
+            left: var(--ui-left);
+            bottom: calc(var(--slider-bottom) + var(--slider-h) + var(--quick-gap));
+            width: var(--ui-width);
+            transform: translateX(-50%);
+            display: flex;
+            justify-content: space-between;
+            padding: 0 9px;
+            transition: opacity .25s ease, transform .25s ease;
+        }
+
+        .quick {
+            display: grid;
+            justify-items: center;
+            gap: 6px;
+        }
+
+        .quick-ico {
+            width: 20px;
+            height: 20px;
+            color: var(--soft-white);
+            filter: drop-shadow(0 0px 4px rgba(0, 0, 0, .2));
+        }
+
+        .quick-txt {
+            font-size: 16px;
+            color: rgba(255, 255, 255, 0.95);
+            letter-spacing: .2px;
+            text-shadow: 0 0px 4px rgba(0, 0, 0, .4);
+        }
+
+        .slide-bar {
+            position: absolute;
+            left: var(--ui-left);
+            bottom: var(--slider-bottom);
+            z-index: 10;
+            width: var(--ui-width);
+            height: var(--slider-h);
+            transform: translateX(-50%);
+            pointer-events: auto;
+        }
+
+        .track {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            left: var(--cx, 0px);
+            width: calc(100% - var(--cx, 0px));
+            border-radius: 999px;
+            z-index: 0;
+            will-change: left, width;
+            background: rgba(255, 255, 255, .16);
+            backdrop-filter: blur(4px) saturate(1.2);
+            -webkit-backdrop-filter: blur(4px) saturate(1.2);
+        }
+
+        .hint-wrap {
+            position: absolute;
+            inset: var(--pad);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1;
+            clip-path: inset(
+                    0 0 0 calc(var(--pad) + var(--cx, 0px) + var(--pad))
+            );
+            will-change: clip-path;
+        }
+
+        .hint {
+            position: relative;
+            display: inline-block;
+            font-size: 20px;
+            font-weight: 400;
+            letter-spacing: .2px;
+            line-height: 1.2;
+            text-shadow: 0 0px 4px rgba(0, 0, 0, .14);
+            white-space: nowrap;
+            transform: translateX(30px);
+        }
+
+        .hint-base {
+            color: rgba(20, 20, 20, 0.75);
+        }
+
+        .hint-shimmer {
+            position: absolute;
+            inset: 0;
+            -webkit-text-fill-color: transparent;
+            -webkit-background-clip: text;
+            background-clip: text;
+            background-image: linear-gradient(
+                    90deg,
+                    rgba(255, 255, 255, 0.00) 0%,
+                    rgba(255, 255, 255, 0.00) 40%,
+                    rgba(255, 255, 255, 0.95) 50%,
+                    rgba(255, 255, 255, 0.00) 60%,
+                    rgba(255, 255, 255, 0.00) 100%
+            );
+            background-size: 300% 100%;
+            animation: hintShimmer 2.5s linear infinite;
+            opacity: 0.95;
+        }
+
+        @keyframes hintShimmer {
+            0% {
+                background-position: 100% 0;
+            }
+            100% {
+                background-position: -10% 0;
+            }
+        }
+
+        .knob {
+            width: var(--knob);
+            height: var(--knob);
+            border-radius: 50%;
+            background: var(--soft-white);
+            display: grid;
+            place-items: center;
+            transform: translateX(0);
+            cursor: grab;
+            pointer-events: auto;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, .18),
+            0 6px 18px rgba(0, 0, 0, .22);
+            position: absolute;
+            left: var(--pad);
+            top: var(--pad);
+            z-index: 12;
+            will-change: transform;
+            touch-action: none;
+        }
+
+        .knob:active {
+            cursor: grabbing;
+        }
+
+        .phone-ico {
+            width: 30px;
+            height: 30px;
+            color: var(--ios-red);
+            transform: translateY(1px);
+        }
+
+        .answered-row {
+            position: absolute;
+            z-index: 2;
+            left: var(--ui-left);
+            bottom: calc(var(--slider-bottom) + var(--pad));
+            transform: translateX(-50%) translateY(0px);
+            display: flex;
+            justify-content: space-between;
+            width: var(--ui-width);
+            gap: 0;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity .25s ease, transform .25s ease;
+        }
+
+        .answered-btn {
+            position: relative;
+            display: grid;
+            justify-items: center;
+            gap: 0;
+            pointer-events: auto;
+            user-select: none;
+            font-size: 16px;
+            color: rgba(255, 255, 255, 0.95);
+            letter-spacing: .2px;
+            text-shadow: 0 0 4px rgba(0, 0, 0, .4);
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .answered-btn > div:last-child {
+            position: absolute;
+            top: calc(100% + var(--ans-label-gap));
+            left: var(--ui-left);
+            transform: translateX(-50%);
+            white-space: nowrap;
+            font-size: 16px;
+            line-height: 1.2;
+        }
+
+        .answered-circle {
+            width: var(--ans-size);
+            height: var(--ans-size);
+            border-radius: 50%;
+            display: grid;
+            place-items: center;
+        }
+
+        .answered-circle.glass {
+            background: rgba(255, 255, 255, .16);
+            backdrop-filter: blur(4px) saturate(1.2);
+            -webkit-backdrop-filter: blur(4px) saturate(1.2);
+        }
+
+        .answered-circle.red {
+            background: var(--ios-red);
+        }
+
+        .answered-ico {
+            width: 34px;
+            height: 34px;
+            color: #fff;
+            opacity: .95;
+            filter: drop-shadow(0 1px 1px rgba(0, 0, 0, .25));
+        }
+
+        .answered .quick-row {
+            opacity: 0;
+        }
+
+        .answered .slide-bar {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .answered .answered-row {
+            z-index: 20;
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+            pointer-events: auto;
+        }
+
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(10px)
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0)
+            }
+        }
+
+        @keyframes driftBreath {
+            0%, 100% {
+                transform: scale(1.05) translate(0, 0);
+            }
+            20% {
+                transform: scale(1.065) translate(-4px, -3px);
+            }
+            50% {
+                transform: scale(1.09) translate(5px, -6px);
+            }
+            80% {
+                transform: scale(1.065) translate(-3px, 4px);
+            }
+        }
+
+        @media (max-width: 768px) {
+            body {
+                display: block;
+                background: #000;
+                margin: 0;
+                overflow: hidden;
+            }
+
+            .phone-card {
+                position: fixed;
+                inset: 0;
+                width: 100vw;
+                height: 100vh;
+                height: 100 svh;
+                height: 100 dvh;
+                aspect-ratio: auto;
+                border-radius: 0;
+            }
+
+            .avatar {
+                width: 100%;
+                height: 100%;
+                object-fit: cover;
+            }
+        }
+
+        /* ========= Subtitles (NEW) ========= */
+        .subtitle {
+            position: absolute;
+            left: var(--ui-left);
+            bottom: clamp(220px, 30%, 350px);
+            transform: translateX(-50%);
+            width: var(--ui-width);
+            text-align: center;
+            font-size: 16px;
+            font-weight: 400;
+            line-height: 1.5;
+            color: rgba(255, 255, 255, 0.95);
+            text-shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
+            padding: 10px;
+            border-radius: 12px;
+            background: rgba(0, 0, 0, 0.2);
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+            opacity: 0;
+            transition: opacity .2s ease;
+            pointer-events: none;
+            z-index: 8;
+        }
+
+        .subtitle:empty {
+            opacity: 0 !important;
+            padding: 0;
+            background: transparent;
+            backdrop-filter: none;
+            -webkit-backdrop-filter: none;
+        }
+
+        .phone-card.answered .subtitle {
+            opacity: 1;
+        }
+
+        .phone-card.ended .subtitle {
+            opacity: 0;
+        }
+    </style>
+</head>
+
+<body>
+<div class="phone-card" id="phoneCard">
+    <img class="avatar" src="./user.webp" alt=""/>
+
+    <div class="call-ui">
+        <div class="status-bar" aria-hidden="true">
+            <div class="status-time">23:59</div>
+            <div class="status-right" aria-hidden="true">
+                <!-- Cellular Signal -->
+                <svg class="sb-signal" viewBox="0 0 25.2051 16.9629" aria-hidden="true">
+                    <path d="M21.4648 16.9531L23.8281 16.9531C24.4434 16.9531 24.8438 16.5234 24.8438 15.9082L24.8438 4.3457C24.8438 3.73047 24.4434 3.30078 23.8281 3.30078L21.4648 3.30078C20.8496 3.30078 20.4395 3.73047 20.4395 4.3457L20.4395 15.9082C20.4395 16.5234 20.8496 16.9531 21.4648 16.9531Z"
+                          fill="currentColor" fill-opacity="0.95"/>
+                    <path d="M14.6484 16.9531L17.002 16.9531C17.6172 16.9531 18.0273 16.5234 18.0273 15.9082L18.0273 7.39258C18.0273 6.77734 17.6172 6.34766 17.002 6.34766L14.6484 6.34766C14.0332 6.34766 13.623 6.77734 13.623 7.39258L13.623 15.9082C13.623 16.5234 14.0332 16.9531 14.6484 16.9531Z"
+                          fill="currentColor" fill-opacity="0.95"/>
+                    <path d="M7.8418 16.9531L10.1953 16.9531C10.8105 16.9531 11.2207 16.5234 11.2207 15.9082L11.2207 10.4492C11.2207 9.83398 10.8105 9.4043 10.1953 9.4043L7.8418 9.4043C7.22656 9.4043 6.81641 9.83398 6.81641 10.4492L6.81641 15.9082C6.81641 16.5234 7.22656 16.9531 7.8418 16.9531Z"
+                          fill="currentColor" fill-opacity="0.95"/>
+                    <path d="M1.02539 16.9531L3.37891 16.9531C3.99414 16.9531 4.4043 16.5234 4.4043 15.9082L4.4043 13.5059C4.4043 12.8906 3.99414 12.4609 3.37891 12.4609L1.02539 12.4609C0.410156 12.4609 0 12.8906 0 13.5059L0 15.9082C0 16.5234 0.410156 16.9531 1.02539 16.9531Z"
+                          fill="currentColor" fill-opacity="0.95"/>
+                </svg>
+                <!-- Wi-Fi -->
+                <svg class="sb-wifi" viewBox="0 0 22.8448 16.2402" aria-hidden="true">
+                    <path d="M1.4761 6.8457C1.67141 7.03125 1.94485 7.03125 2.13039 6.83594C4.53274 4.28711 7.6968 2.93945 11.2417 2.93945C14.8062 2.93945 17.9898 4.29688 20.3726 6.8457C20.5484 7.02148 20.812 7.01172 21.0073 6.82617L22.355 5.47852C22.5308 5.30273 22.521 5.08789 22.3843 4.92188C20.0894 2.08984 15.773 0.00976562 11.2417 0.00976562C6.72024 0.00976562 2.3843 2.08984 0.0991432 4.92188C-0.0375756 5.08789-0.0375756 5.30273 0.12844 5.47852Z"
+                          fill="currentColor" opacity="0.95"/>
+                    <path d="M5.52883 10.9277C5.74367 11.1328 6.00735 11.1035 6.20266 10.8887C7.37453 9.58984 9.2886 8.64258 11.2417 8.65234C13.2144 8.64258 15.1284 9.61914 16.3198 10.918C16.4956 11.123 16.7398 11.1133 16.9546 10.918L18.4683 9.41406C18.6245 9.25781 18.6441 9.04297 18.4976 8.86719C17.023 7.06055 14.2886 5.70312 11.2417 5.70312C8.19485 5.70312 5.46047 7.06055 3.98586 8.86719C3.83938 9.04297 3.84914 9.23828 4.01516 9.41406Z"
+                          fill="currentColor" opacity="0.95"/>
+                    <path d="M11.2417 16.2402C11.4566 16.2402 11.6421 16.1426 12.023 15.7715L14.4058 13.4863C14.5523 13.3398 14.5913 13.125 14.4546 12.9492C13.8198 12.1289 12.6187 11.416 11.2417 11.416C9.82571 11.416 8.62453 12.1582 7.98977 13.0078C7.89211 13.1641 7.93117 13.3398 8.08742 13.4863L10.4605 15.7715C10.8413 16.1328 11.0269 16.2402 11.2417 16.2402Z"
+                          fill="currentColor" opacity="0.85"/>
+                </svg>
+                <!-- Battery -->
+                <svg class="sb-battery" viewBox="0 0 29.2676 13.2129" aria-hidden="true">
+                    <path d="M5.20508 13.2129L20.5566 13.2129C22.2266 13.2129 23.6328 13.0566 24.6289 12.0605C25.625 11.0645 25.7715 9.67773 25.7715 8.00781L25.7715 5.20508C25.7715 3.53516 25.625 2.14844 24.6289 1.15234C23.6328 0.15625 22.2266 0 20.5566 0L5.18555 0C3.54492 0 2.13867 0.15625 1.14258 1.15234C0.146484 2.14844 0 3.54492 0 5.17578L0 8.00781C0 9.67773 0.146484 11.0645 1.14258 12.0605C2.13867 13.0566 3.54492 13.2129 5.20508 13.2129ZM4.94141 11.6406C3.93555 11.6406 2.88086 11.5039 2.28516 10.918C1.69922 10.3223 1.57227 9.27734 1.57227 8.27148L1.57227 4.96094C1.57227 3.93555 1.69922 2.89062 2.28516 2.29492C2.88086 1.69922 3.94531 1.57227 4.9707 1.57227L20.8301 1.57227C21.8359 1.57227 22.8906 1.70898 23.4766 2.29492C24.0723 2.89062 24.1992 3.92578 24.1992 4.93164L24.1992 8.27148C24.1992 9.27734 24.0723 10.3223 23.4766 10.918C22.8906 11.5039 21.8359 11.6406 20.8301 11.6406ZM27.0996 9.13086C27.8711 9.08203 28.9062 8.0957 28.9062 6.60156C28.9062 5.11719 27.8711 4.13086 27.0996 4.08203Z"
+                          fill="currentColor" fill-opacity="0.425"/>
+
+
+                    <path d="M4.42383 10.5078L21.3477 10.5078C22.0215 10.5078 22.4121 10.4102 22.6855 10.1367C22.9492 9.86328 23.0566 9.47266 23.0566 8.79883L23.0566 4.41406C23.0566 3.74023 22.9492 3.34961 22.6855 3.07617C22.4121 2.80273 22.0117 2.70508 21.3477 2.70508L4.45312 2.70508C3.75 2.70508 3.34961 2.80273 3.08594 3.07617C2.8125 3.34961 2.71484 3.75 2.71484 4.43359L2.71484 8.79883C2.71484 9.47266 2.8125 9.86328 3.08594 10.1367C3.35938 10.4102 3.75977 10.5078 4.42383 10.5078Z"
+                          fill="currentColor" fill-opacity="0.85"/>
+                </svg>
+            </div>
+        </div>
+
+        <div class="name">Future You</div>
+        <div class="sub" id="subText">mobile</div>
+        <!-- ✅ Subtitles container (NEW) -->
+        <div class="subtitle" id="subtitle"></div>
+
+        <!-- quick actions -->
+        <div class="quick-row">
+            <div class="quick">
+                <svg class="quick-ico" viewBox="0 0 19.0332 21.9238" aria-hidden="true">
+                    <path d="M9.33594 20.2539C14.4922 20.2539 18.6719 16.0742 18.6719 10.918C18.6719 5.76172 14.4922 1.57227 9.33594 1.57227C4.17969 1.57227 0 5.76172 0 10.918C0 16.0742 4.17969 20.2539 9.33594 20.2539ZM4.89258 11.9922C4.51172 11.9922 4.21875 11.6992 4.21875 11.3184C4.21875 10.9375 4.51172 10.6348 4.89258 10.6348L8.65234 10.6348L8.65234 5.40039C8.65234 5.01953 8.94531 4.7168 9.32617 4.7168C9.70703 4.7168 10.0098 5.01953 10.0098 5.40039L10.0098 11.3184C10.0098 11.6992 9.70703 11.9922 9.32617 11.9922ZM1.31836 4.08203C1.46484 4.08203 1.57227 4.0625 1.70898 3.95508L4.98047 1.48438C5.13672 1.36719 5.22461 1.21094 5.22461 1.04492C5.22461 0.839844 5.12695 0.673828 4.96094 0.517578C4.58984 0.185547 3.92578 0 3.33984 0C1.81641 0 0.595703 1.2207 0.595703 2.74414C0.595703 3.10547 0.654297 3.4668 0.761719 3.69141C0.869141 3.93555 1.07422 4.08203 1.31836 4.08203ZM17.3535 4.08203C17.5977 4.08203 17.8027 3.92578 17.9199 3.69141C18.0176 3.47656 18.0762 3.10547 18.0762 2.74414C18.0762 1.2207 16.8652 0 15.332 0C14.7461 0 14.082 0.185547 13.7109 0.517578C13.5449 0.673828 13.4473 0.839844 13.4473 1.04492C13.4473 1.21094 13.5352 1.36719 13.7012 1.48438L16.9629 3.95508C17.1094 4.0625 17.207 4.08203 17.3535 4.08203ZM1.17188 19.9707C1.46484 20.2734 1.94336 20.2734 2.24609 19.9609L4.0918 18.125L3.03711 17.0801L1.18164 18.916C0.878906 19.209 0.888672 19.6875 1.17188 19.9707ZM17.5 19.9707C17.793 19.6875 17.793 19.209 17.4902 18.916L15.6348 17.0801L14.5898 18.125L16.4258 19.9609C16.7285 20.2734 17.207 20.2734 17.5 19.9707Z"
+                          fill="currentColor" fill-opacity="0.95"/>
+                </svg>
+                <div class="quick-txt">Remind Me</div>
+            </div>
+
+            <div class="quick">
+                <svg class="quick-ico" viewBox="0 0 22.9492 20.3418" aria-hidden="true">
+                    <path d="M11.2891 18.7891C17.8418 18.7891 22.5879 14.834 22.5879 9.39453C22.5879 3.94531 17.832 0 11.2891 0C4.74609 0 0 3.94531 0 9.39453C0 13.3105 2.14844 14.3652 2.14844 16.1133C2.14844 16.875 1.9043 17.373 1.31836 17.9199C0.878906 18.3105 1.11328 18.7891 1.75781 18.7891C3.10547 18.7891 4.48242 18.3496 5.48828 17.6172C7.17773 18.3887 9.14062 18.7891 11.2891 18.7891Z"
+                          fill="currentColor" fill-opacity="0.95"/>
+                </svg>
+                <div class="quick-txt">Message</div>
+            </div>
+        </div>
+
+        <!-- Slider -->
+        <div class="slide-bar" id="slideBar">
+            <div class="track" id="track"></div>
+
+            <div class="hint-wrap" id="hintWrap">
+                <div class="hint">
+                    <span class="hint-base" id="hintBase">slide to answer</span>
+                    <span class="hint-shimmer" id="hintShimmer" aria-hidden="true">slide to answer</span>
+                </div>
+            </div>
+
+            <div class="knob" id="knob">
+                <svg class="phone-ico" viewBox="0 0 18.5645 18.2324" aria-hidden="true">
+                    <path d="M5 13.1543C7.87109 16.0352 11.3086 18.2227 14.0723 18.2227C15.3711 18.2227 16.5039 17.7051 17.2461 16.875C17.959 16.0742 18.2031 15.4785 18.2031 14.9512C18.2031 14.541 17.9492 14.1602 17.3047 13.7109L14.9219 12.002C14.3262 11.582 14.0625 11.5039 13.7109 11.5039C13.4082 11.5039 13.1543 11.5625 12.6465 11.8359L11.084 12.6953C10.8984 12.8027 10.8203 12.8223 10.6836 12.8223C10.498 12.8223 10.3711 12.7734 10.1855 12.6953C9.44336 12.3535 8.39844 11.5332 7.4707 10.6055C6.54297 9.67773 5.82031 8.73047 5.44922 7.99805C5.40039 7.90039 5.3418 7.74414 5.3418 7.58789C5.3418 7.46094 5.41016 7.35352 5.48828 7.2168L6.40625 5.64453C6.66016 5.21484 6.72852 4.98047 6.72852 4.64844C6.72852 4.26758 6.60156 3.85742 6.24023 3.33984L4.59961 1.05469C4.13086 0.400391 3.7793 0 3.25195 0C2.59766 0 1.80664 0.498047 1.24023 1.04492C0.429688 1.82617 0 2.91992 0 4.15039C0 6.93359 2.13867 10.3027 5 13.1543Z"
+                          fill="currentColor"/>
+                </svg>
+            </div>
+        </div>
+
+        <!-- Answered actions -->
+        <div class="answered-row" id="answeredRow">
+            <div class="answered-btn" id="btnMute" role="button" aria-label="Mute">
+                <div class="answered-circle glass">
+                    <svg class="answered-ico ico-mute" viewBox="0 0 20.5737 21.9971" aria-hidden="true">
+                        <path d="M14.7456 18.8456C14.6182 19.3076 14.2143 19.6167 13.6853 19.6167C13.2361 19.6167 12.8552 19.4312 12.406 19.0015L8.24586 15.0562C8.1775 14.9976 8.09937 14.9683 8.00172 14.9683L5.19898 14.9683C3.88062 14.9683 3.15797 14.2456 3.15797 12.8296L3.15797 9.1968C3.15797 8.56128 3.30556 8.06338 3.59041 7.70997ZM14.7888 3.5425L14.7888 13.5358L8.23109 6.98189C8.23614 6.97838 8.24102 6.97438 8.24586 6.97024L12.406 3.06399C12.9041 2.58547 13.2166 2.39016 13.6658 2.39016C14.3298 2.39016 14.7888 2.90774 14.7888 3.5425Z"
+                              fill="currentColor" fill-opacity="0.95"/>
+                        <path d="M18.158 20.6421C18.4509 20.9351 18.9294 20.9351 19.2224 20.6421C19.5056 20.3394 19.5154 19.8706 19.2224 19.5777L2.4939 2.85891C2.20093 2.56594 1.71265 2.56594 1.41968 2.85891C1.13648 3.14211 1.13648 3.64016 1.41968 3.92336Z"
+                              fill="currentColor" fill-opacity="0.95"/>
+                    </svg>
+
+                    <!-- Speaker icon (默认隐藏) -->
+                    <svg class="answered-ico ico-speak" viewBox="0 0 14.2578 17.2363" aria-hidden="true"
+                         style="display:none">
+                        <path d="M10.5273 17.2363C11.1719 17.2363 11.6309 16.7773 11.6309 16.1426L11.6309 1.16211C11.6309 0.527344 11.1719 0.00976562 10.5078 0.00976562C10.0586 0.00976562 9.74609 0.205078 9.24805 0.683594L5.08789 4.58984C5.01953 4.64844 4.94141 4.67773 4.84375 4.67773L2.04102 4.67773C0.722656 4.67773 0 5.41016 0 6.81641L0 10.4492C0 11.8652 0.722656 12.5879 2.04102 12.5879L4.84375 12.5879C4.94141 12.5879 5.01953 12.6172 5.08789 12.6758L9.24805 16.6211C9.69727 17.0508 10.0781 17.2363 10.5273 17.2363Z"
+                              fill="currentColor" fill-opacity="0.95"/>
+                    </svg>
+                </div>
+                <div class="label-mute">Mute</div>
+            </div>
+
+            <div class="answered-btn" id="btnEnd" role="button" aria-label="End">
+                <div class="answered-circle red">
+                    <svg class="answered-ico" viewBox="0 0 23.4375 8.38867" aria-hidden="true">
+                        <path d="M11.5332 0C7.73438 0 3.4082 0.683594 1.29883 2.86133C0.488281 3.68164 0 4.70703 0 6.00586C0 6.89453 0.283203 8.21289 1.31836 8.31055C1.60156 8.38867 1.875 8.35938 2.22656 8.30078L5.10742 7.82227C6.10352 7.65625 6.57227 7.28516 6.83594 6.32812L7.31445 4.60938C7.41211 4.25781 7.50977 4.14062 7.92969 3.98438C8.71094 3.70117 10 3.54492 11.5332 3.54492C13.0762 3.54492 14.3652 3.70117 15.1465 3.98438C15.5664 4.14062 15.6641 4.25781 15.752 4.60938L16.2402 6.32812C16.5039 7.28516 16.9727 7.65625 17.9688 7.82227L20.8496 8.30078C21.1914 8.35938 21.4648 8.38867 21.748 8.31055C22.793 8.21289 23.0762 6.89453 23.0762 6.00586C23.0762 4.70703 22.5879 3.68164 21.7773 2.86133C19.668 0.683594 15.3418 0 11.5332 0Z"
+                              fill="currentColor" fill-opacity="0.95"/>
+                    </svg>
+                </div>
+                <div>End</div>
+            </div>
+
+            <div class="answered-btn" id="btnPause" role="button" aria-label="Pause">
+                <div class="answered-circle glass">
+                    <svg class="answered-ico ico-pause" viewBox="0 0 11.914 16.1582" aria-hidden="true">
+                        <path d="M1.30489 16.1458L3.52445 16.1458C4.3731 16.1458 4.81898 15.6999 4.81898 14.8409L4.81898 1.3049C4.81898 0.404486 4.3731-1.77636e-15 3.52445-1.77636e-15L1.30489-1.77636e-15C0.445878-1.77636e-15 0 0.445887 0 1.3049L0 14.8409C0 15.6999 0.445878 16.1458 1.30489 16.1458ZM8.39828 16.1458L10.6178 16.1458C11.4665 16.1458 11.9124 15.6999 11.9124 14.8409L11.9124 1.3049C11.9124 0.404486 11.4665-1.77636e-15 10.6178-1.77636e-15L8.39828-1.77636e-15C7.53929-1.77636e-15 7.09341 0.445887 7.09341 1.3049L7.09341 14.8409C7.09341 15.6999 7.53929 16.1458 8.39828 16.1458Z"
+                              fill="currentColor" fill-opacity="0.95"/>
+                    </svg>
+
+                    <!-- Play icon (默认隐藏) -->
+                    <svg class="answered-ico ico-play" viewBox="0 0 16.2891 16.416" aria-hidden="true"
+                         style="display:none">
+                        <path d="M1.70898 14.9805C1.70898 15.9473 2.26562 16.4062 2.92969 16.4062C3.22266 16.4062 3.52539 16.3086 3.82812 16.1523L15.2051 9.50195C16.0156 9.0332 16.2891 8.71094 16.2891 8.20312C16.2891 7.68555 16.0156 7.37305 15.2051 6.9043L3.82812 0.253906C3.52539 0.0878906 3.22266 0 2.92969 0C2.26562 0 1.70898 0.458984 1.70898 1.42578Z"
+                              fill="currentColor" fill-opacity="0.95"/>
+                    </svg>
+                </div>
+                <div class="label-pause">Pause</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="end-mask" id="endMask" aria-hidden="true"></div>
+
+</div>
+
+<script>
+    (() => {
+        const phoneCard = document.getElementById('phoneCard');
+        const bar = document.getElementById('slideBar');
+        const knob = document.getElementById('knob');
+        const hintShimmer = document.getElementById('hintShimmer');
+        const hintBase = document.getElementById('hintBase');
+        const subText = document.getElementById('subText');
+
+        const btnMute = document.getElementById('btnMute');
+        const btnEnd = document.getElementById('btnEnd');
+        const btnPause = document.getElementById('btnPause');
+
+        const subtitleEl = document.getElementById('subtitle'); // ✅ NEW
+        const avatarEl = phoneCard.querySelector('.avatar'); // ✅ NEW
+
+        // ✅ NEW: posts & timing (ms)
+        const POST1_SRC = './post1.webp';
+        const POST2_SRC = './post2.webp';
+        const POST3_SRC = './post3.webp';
+
+        const t1 = 10000; // 你要的 t1，单位 ms，自行改
+        const t2 = 10000; // 你要的 t2，单位 ms，自行改
+
+        let postTimers = []; // ✅ NEW: store timers to clear if hangup
+        // ✅ NEW: image preload helper
+        function preloadImg(src) {
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                img.onload = () => resolve(src);
+                img.onerror = reject;
+                img.src = src;
+            });
+        }
+
+        // ✅ NEW: preload posts ASAP
+        const post1Ready = preloadImg(POST1_SRC);
+        const post2Ready = preloadImg(POST2_SRC);
+        const post3Ready = preloadImg(POST3_SRC);
+
+        // ✅ NEW: fade swap helper (uses your CSS transition)
+        function fadeSwapAvatar(src) {
+            if (!avatarEl) return;
+            avatarEl.style.opacity = '0';
+            const DUR = 800; // 要和 CSS 里的 0.8s 对齐
+
+            setTimeout(() => {
+                avatarEl.src = src;      // 此时图片已 preload，不会闪
+                avatarEl.style.opacity = '1';
+            }, DUR * 0.6); // 半程左右换图
+        }
+
+
+
+        let dragging = false;
+        let startX = 0;
+        let currentX = 0;
+        let maxX = 0;
+        let answered = false;
+
+        /* ========= Call timer (NEW) ========= */
+        let callSec = 0;
+        let timerId = null;
+        let timerPaused = false;
+
+        const fmtTime = (s) => {
+            const mm = String(Math.floor(s / 60)).padStart(2, '0');
+            const ss = String(s % 60).padStart(2, '0');
+            return `${mm}:${ss}`;
+        };
+
+        const renderTimer = () => {
+            subText.textContent = fmtTime(callSec);
+        };
+
+        const startTimer = () => {
+            stopTimer();
+            callSec = 0;
+            timerPaused = false;
+            renderTimer();
+            timerId = setInterval(() => {
+                if (timerPaused || !answered) return;
+                callSec += 1;
+                renderTimer();
+            }, 1000);
+        };
+
+        const pauseTimer = () => {
+            timerPaused = true;
+        };
+        const resumeTimer = () => {
+            timerPaused = false;
+        };
+
+        const stopTimer = () => {
+            if (timerId) clearInterval(timerId);
+            timerId = null;
+        };
+
+        /* ========= SRT subtitles (PRELOAD) ========= */
+        const SRT_SRC = './ans.srt';
+        let srtCues = [];
+        let srtLoaded = false;
+        let lastCueIndex = -1;
+
+        function srtTimeToSec(t) {
+            const [hh, mm, rest] = t.split(':');
+            const [ss, ms] = rest.split(',');
+            return (+hh) * 3600 + (+mm) * 60 + (+ss) + (+ms) / 1000;
+        }
+
+        function parseSRT(text) {
+            const blocks = text.trim().split(/\n\s*\n/);
+            const cues = [];
+            for (const b of blocks) {
+                const lines = b.split(/\n/).map(l => l.trim());
+                if (lines.length < 2) continue;
+
+                let i = 0;
+                if (/^\d+$/.test(lines[0])) i++;
+
+                const timeLine = lines[i++];
+                const m = timeLine.match(/(\d{2}:\d{2}:\d{2},\d{3})\s*-->\s*(\d{2}:\d{2}:\d{2},\d{3})/);
+                if (!m) continue;
+
+                const start = srtTimeToSec(m[1]);
+                const end = srtTimeToSec(m[2]);
+                const textLines = lines.slice(i).join('\n');
+                cues.push({start, end, text: textLines});
+            }
+            return cues;
+        }
+
+        async function preloadSRT() {
+            if (srtLoaded) return srtCues;
+            try {
+                const res = await fetch(SRT_SRC, {cache: 'force-cache'});
+                if (!res.ok) throw new Error('srt fetch failed');
+                const txt = await res.text();
+                srtCues = parseSRT(txt);
+                srtLoaded = true;
+            } catch (e) {
+                srtCues = [];
+                srtLoaded = false;
+            }
+            return srtCues;
+        }
+
+        function clearSubtitle() {
+            subtitleEl.textContent = '';
+            lastCueIndex = -1;
+        }
+
+        function updateSubtitleByTime(t) {
+            if (!srtCues.length) {
+                subtitleEl.textContent = '';
+                return;
+            }
+
+            if (lastCueIndex >= 0) {
+                const c = srtCues[lastCueIndex];
+                if (t >= c.start && t <= c.end) {
+                    return;
+                }
+            }
+
+            for (let k = 0; k < srtCues.length; k++) {
+                const c = srtCues[k];
+                if (t >= c.start && t <= c.end) {
+                    subtitleEl.textContent = c.text;
+                    lastCueIndex = k;
+                    return;
+                }
+            }
+
+            subtitleEl.textContent = '';
+            lastCueIndex = -1;
+        }
+
+        // ✅ PRELOAD SRT ASAP
+        preloadSRT();
+
+        /* ========= Preload audio to Blob (方案B) ========= */
+        async function preloadAudioToBlob(url) {
+            const res = await fetch(url, {cache: 'force-cache'});
+            if (!res.ok) throw new Error('audio fetch failed: ' + url);
+            const blob = await res.blob();
+            const blobUrl = URL.createObjectURL(blob);
+
+            const audio = new Audio(blobUrl);
+            audio.preload = 'auto';
+
+            await new Promise((resolve) => {
+                audio.addEventListener('canplaythrough', resolve, {once: true});
+                audio.load();
+            });
+
+            return audio;
+        }
+
+        /* ========= Ringing audio ========= */
+        const RING_SRC = './ring.m4a';
+        const FADE_IN_MS = 5000;
+        const START_VOL = 0.05;
+        const TARGET_VOL = 1;
+
+        let ringAudio = null;
+        let fadeRaf = null;
+        let ringing = false;
+        let needUnlock = false;
+
+        function fadeInRing() {
+            if (fadeRaf) cancelAnimationFrame(fadeRaf);
+            const t0 = performance.now();
+            const tick = (t) => {
+                if (!ringing) return;
+                const p = Math.min(1, (t - t0) / FADE_IN_MS);
+                ringAudio.volume = START_VOL + (TARGET_VOL - START_VOL) * p;
+                if (p < 1) fadeRaf = requestAnimationFrame(tick);
+            };
+            fadeRaf = requestAnimationFrame(tick);
+        }
+
+        async function startRinging({muted = false} = {}) {
+            if (ringing || !ringAudio) return;
+            ringing = true;
+            ringAudio.currentTime = 0;
+            ringAudio.muted = muted;
+            ringAudio.volume = START_VOL;
+            try {
+                await ringAudio.play();
+                fadeInRing();
+            } catch (e) {
+                ringing = false;
+                throw e;
+            }
+        }
+
+        function stopRinging() {
+            ringing = false;
+            if (fadeRaf) cancelAnimationFrame(fadeRaf);
+            fadeRaf = null;
+            if (!ringAudio) return;
+            ringAudio.pause();
+            ringAudio.currentTime = 0;
+            ringAudio.muted = true;
+        }
+
+        (async () => {
+            try {
+                ringAudio = await preloadAudioToBlob(RING_SRC);
+                ringAudio.loop = true;
+                ringAudio.volume = START_VOL;
+
+                try {
+                    await startRinging({muted: false});
+                } catch {
+                    try {
+                        await startRinging({muted: true});
+                        needUnlock = true;
+                    } catch {
+                        needUnlock = true;
+                    }
+                }
+            } catch {
+                ringAudio = new Audio(RING_SRC);
+                ringAudio.loop = true;
+                ringAudio.preload = 'auto';
+                ringAudio.volume = START_VOL;
+                needUnlock = true;
+            }
+        })();
+
+        function unlockSoundOnce() {
+            if (!needUnlock || answered) return;
+            needUnlock = false;
+
+            if (!ringing) {
+                startRinging({muted: false}).catch(() => {
+                });
+                return;
+            }
+            ringAudio.muted = false;
+            fadeInRing();
+        }
+
+        function hangUp() {
+            stopAnswer();
+            stopRinging();
+            stopTimer();
+            clearSubtitle();          // ✅ NEW
+
+            postTimers.forEach(clearTimeout); // ✅ NEW
+            postTimers = [];
+
+            phoneCard.classList.add('ended');
+            answered = false;
+        }
+
+        /* ========= Answer audio ========= */
+        const ANSWER_SRC = './ans.m4a';
+        let answerAudio = null;
+        let needAnswerUnlock = false;
+
+        (async () => {
+            try {
+                answerAudio = await preloadAudioToBlob(ANSWER_SRC);
+                answerAudio.loop = false;
+                answerAudio.volume = 1.0;
+
+                answerAudio.addEventListener('ended', () => {
+                    if (!answered) return;
+                    clearSubtitle();      // ✅ NEW
+                    hangUp();
+                });
+
+                // ✅ NEW: sync subtitles
+                answerAudio.addEventListener('timeupdate', () => {
+                    if (!answered) return;
+                    updateSubtitleByTime(answerAudio.currentTime);
+                });
+
+            } catch {
+                // ignore; ensureAnswerAudio() will fallback
+            }
+        })();
+
+        function ensureAnswerAudio() {
+            if (!answerAudio) {
+                answerAudio = new Audio(ANSWER_SRC);
+                answerAudio.preload = 'auto';
+                answerAudio.loop = false;
+                answerAudio.muted = false;
+                answerAudio.volume = 1.0;
+
+                answerAudio.addEventListener('ended', () => {
+                    if (!answered) return;
+                    clearSubtitle();      // ✅ NEW
+                    hangUp();
+                });
+
+                // ✅ NEW: sync subtitles
+                answerAudio.addEventListener('timeupdate', () => {
+                    if (!answered) return;
+                    updateSubtitleByTime(answerAudio.currentTime);
+                });
+            }
+            return answerAudio;
+        }
+
+        async function playAnswer({muted = false} = {}) {
+            const a = ensureAnswerAudio();
+            a.currentTime = 0;
+            a.muted = !!muted;
+
+            // ✅ NEW: reset subtitle and ensure srt preloaded
+            clearSubtitle();
+            if (!srtLoaded) preloadSRT();
+
+            try {
+                await a.play();
+                needAnswerUnlock = false;
+            } catch {
+                // autoplay 被拦：等 answered 后用户再点一次
+                needAnswerUnlock = true;
+            }
+        }
+
+        function stopAnswer() {
+            if (!answerAudio) return;
+            answerAudio.pause();
+            answerAudio.currentTime = 0;
+        }
+
+        // 只在“已接听”状态下才解锁 answer
+        function unlockAnswerIfNeeded() {
+            if (!answered) return;
+            if (!needAnswerUnlock) return;
+            needAnswerUnlock = false;
+            if (!answerAudio) return;
+            answerAudio.muted = false;
+            answerAudio.play().catch(() => {
+            });
+        }
+
+        if (window.PointerEvent) {
+            window.addEventListener('pointerdown', unlockSoundOnce, {once: true});
+            window.addEventListener('pointerdown', unlockAnswerIfNeeded);
+        } else {
+            window.addEventListener('touchstart', unlockSoundOnce, {once: true});
+            window.addEventListener('touchstart', unlockAnswerIfNeeded);
+        }
+
+        /* ========= slider logic ========= */
+        const calcMax = () => {
+            const barW = bar.clientWidth;
+            const knobW = knob.clientWidth;
+            const pad = parseFloat(getComputedStyle(document.documentElement)
+                .getPropertyValue('--pad')) || 0;
+            maxX = barW - knobW - 2 * pad;
+        };
+        calcMax();
+        window.addEventListener('resize', calcMax);
+
+        const setX = (x) => {
+            currentX = Math.max(0, Math.min(maxX, x));
+            knob.style.transform = `translateX(${currentX}px)`;
+            bar.style.setProperty('--cx', `${currentX}px`);
+
+            const t = maxX ? currentX / maxX : 0;
+            hintShimmer.style.opacity = String(Math.max(0, 1 - t));
+        };
+
+        const onDown = (e) => {
+            if (answered) return;
+            dragging = true;
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            startX = clientX - currentX;
+            knob.setPointerCapture?.(e.pointerId);
+        };
+
+        const onMove = (e) => {
+            if (!dragging || answered) return;
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const x = clientX - startX;
+            setX(x);
+        };
+
+        const enterAnsweredUI = () => {
+            answered = true;
+            phoneCard.classList.add('answered');
+            setX(maxX);
+            hintBase.textContent = '';
+            hintShimmer.textContent = '';
+            hintShimmer.style.opacity = '1';
+
+            stopRinging();
+            playAnswer({muted: false});
+
+            startTimer();
+
+            // ✅ NEW: swap avatar after answer (preload + fade)
+            postTimers.forEach(clearTimeout);
+            postTimers = [];
+
+            if (!avatarEl) return;
+
+            post1Ready.then(() => {
+                if (!answered || phoneCard.classList.contains('ended')) return;
+                fadeSwapAvatar(POST1_SRC);
+
+                postTimers.push(setTimeout(() => {
+                    post2Ready.then(() => {
+                        if (!answered || phoneCard.classList.contains('ended')) return;
+                        fadeSwapAvatar(POST2_SRC);
+
+                        postTimers.push(setTimeout(() => {
+                            post3Ready.then(() => {
+                                if (!answered || phoneCard.classList.contains('ended')) return;
+                                fadeSwapAvatar(POST3_SRC);
+                            });
+                        }, t2));
+                    });
+                }, t1));
+            });
+        };
+
+        const onUp = () => {
+            if (!dragging || answered) return;
+            dragging = false;
+
+            const threshold = maxX * 0.9;
+            if (currentX >= threshold) {
+                enterAnsweredUI();
+                return;
+            }
+
+            const from = currentX;
+            const dur = 220;
+            const t0 = performance.now();
+            const anim = (t) => {
+                const p = Math.min(1, (t - t0) / dur);
+                const ease = 1 - Math.pow(1 - p, 3);
+                setX(from * (1 - ease));
+                if (p < 1) requestAnimationFrame(anim);
+            };
+            requestAnimationFrame(anim);
+        };
+
+        if (window.PointerEvent) {
+            knob.addEventListener('pointerdown', onDown);
+            window.addEventListener('pointermove', onMove);
+            window.addEventListener('pointerup', onUp);
+        } else {
+            knob.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                onDown(e);
+            }, {passive: false});
+            window.addEventListener('touchmove', (e) => {
+                e.preventDefault();
+                onMove(e);
+            }, {passive: false});
+            window.addEventListener('touchend', onUp);
+        }
+
+        setX(0);
+
+        /* ========= answered buttons ========= */
+        let mutedByUser = false;
+        let pausedByUser = false;
+
+        const icoMute = btnMute.querySelector('.ico-mute');
+        const icoSpeak = btnMute.querySelector('.ico-speak');
+        const labelMute = btnMute.querySelector('.label-mute');
+
+        const icoPause = btnPause.querySelector('.ico-pause');
+        const icoPlay = btnPause.querySelector('.ico-play');
+        const labelPause = btnPause.querySelector('.label-pause');
+
+        function setMuteUI(isMuted) {
+            icoMute.style.display = isMuted ? 'none' : 'block';
+            icoSpeak.style.display = isMuted ? 'block' : 'none';
+            labelMute.textContent = isMuted ? 'Speak' : 'Mute';
+        }
+
+        function setPlayUI(isPaused) {
+            icoPause.style.display = isPaused ? 'none' : 'block';
+            icoPlay.style.display = isPaused ? 'block' : 'none';
+            labelPause.textContent = isPaused ? 'Play' : 'Pause';
+        }
+
+        setMuteUI(false);
+        setPlayUI(false);
+
+        btnEnd.addEventListener('click', () => {
+            if (!answered) return;
+            hangUp(); // ✅ stops timer too
+        });
+
+        btnMute.addEventListener('click', () => {
+            if (!answered) return;
+            const a = ensureAnswerAudio();
+            mutedByUser = !mutedByUser;
+            a.muted = mutedByUser;
+            setMuteUI(mutedByUser);
+        });
+
+        btnPause.addEventListener('click', () => {
+            if (!answered) return;
+            const a = ensureAnswerAudio();
+            if (a.paused) {
+                a.play().catch(() => {
+                    needAnswerUnlock = true;
+                });
+                pausedByUser = false;
+                resumeTimer();   // ✅ NEW: resume timer on Play
+            } else {
+                a.pause();
+                pausedByUser = true;
+                pauseTimer();    // ✅ NEW: pause timer on Pause
+            }
+            setPlayUI(pausedByUser);
+        });
+
+
+    })();
+</script>
+</body>
+</html>
